@@ -8,10 +8,11 @@ import logging
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
 from telegram import Update
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import Application, CommandHandler, InlineQueryHandler, ContextTypes
 from services.search_service import JobSearchService
 from settings import Settings
 from logger import Logger
+from controllers.inline_query_controller import inline_query_controller
 
 logger = Logger.get_logger(__name__, file_prefix='server')
 
@@ -125,9 +126,10 @@ async def handle_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Search command error for user {update.effective_user.id}: {e}")
         await update.message.reply_text(f"🚨 Error: {str(e)}")
 
-# Register command handler
+# Register handlers
 if telegram_app:
     telegram_app.add_handler(CommandHandler("search", handle_search))
+    telegram_app.add_handler(InlineQueryHandler(inline_query_controller.handle_inline_query))
 
 def get_server_info():
     """Server configuration information"""
