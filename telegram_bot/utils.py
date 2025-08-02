@@ -1,17 +1,39 @@
-def format_telegram_results(bot, results):
-    """Format search results for Telegram message"""
-    if not results or all(not r.get('jobs', []) for r in results.values() if isinstance(r, dict)):
-        return "No jobs found. Try different parameters."
+import asyncio
+from telegram.constants import ChatAction
+from telegram.ext import CallbackContext
 
-    message = [f"Total search time: {results['global_time']:.0f} ms\n"]
-    for site_name, result in results.items():
-        if site_name == 'global_time' or not isinstance(result, dict):
-            continue
-        jobs = result.get('jobs', [])
-        if jobs:
-            site_display_name = next((s.name for s in bot.sites.values() if s.name.lower() == site_name.lower()),
-                                     bot.settings.AVAILABLE_SITES.get(site_name, {}).get('name', site_name))
-            message.append(f"\n{site_display_name} ({result.get('timing', 0):.0f} ms):")
-            for i, job in enumerate(jobs[:5], 1):  # Limit to 5 jobs
-                message.append(f"{i}. {job}")
-    return '\n'.join(message)
+
+async def send_typing_action(context: CallbackContext, chat_id: int, duration: float = 1.0):
+    """
+    Send typing action and wait for specified duration.
+    
+    Args:
+        context: The callback context from the handler
+        chat_id: The chat ID to send typing action to
+        duration: How long to show typing indicator (in seconds)
+    """
+    await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+    if duration > 0:
+        await asyncio.sleep(duration)
+
+
+async def with_typing_indicator(func, context: CallbackContext, chat_id: int, *args, **kwargs):
+    """
+    Execute a function while showing typing indicator.
+    
+    Args:
+        func: The function to execute
+        context: The callback context
+        chat_id: The chat ID to send typing action to
+        *args, **kwargs: Arguments to pass to the function
+    """
+    # Send typing indicator
+    await context.bot.send_chat_action(chat_id=chat_id, action=ChatAction.TYPING)
+    
+    # Execute the function
+    if asyncio.iscoroutinefunction(func):
+        result = await func(*args, **kwargs)
+    else:
+        result = func(*args, **kwargs)
+    
+    return result

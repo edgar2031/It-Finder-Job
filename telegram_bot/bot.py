@@ -2,6 +2,7 @@ import os
 
 from dotenv import load_dotenv
 from telegram import ReplyKeyboardMarkup
+from telegram.constants import ChatAction
 from telegram.ext import Application, ConversationHandler
 
 from job_sites import HHSite, GeekJobSite
@@ -29,6 +30,10 @@ class TelegramBot:
         # Use Application instead of Updater
         self.application = Application.builder().token(self.token).build()
         self.dp = self.application  # Application includes dispatcher-like functionality
+        
+        # Store bot instance in bot_data for handlers to access
+        self.application.bot_data['bot_instance'] = self
+        
         self._setup_handlers()
 
     def _setup_handlers(self):
@@ -40,8 +45,14 @@ class TelegramBot:
         # Run the application with async polling
         self.application.run_polling(allowed_updates=["message", "callback_query"])
 
-    def start(self, update, context):
+    async def start(self, update, context):
         try:
+            # Send typing indicator
+            await context.bot.send_chat_action(
+                chat_id=update.effective_chat.id, 
+                action=ChatAction.TYPING
+            )
+            
             keyboard = [
                 [Settings.get_site_name('hh'), Settings.get_site_name('geekjob')],
                 ['all']
@@ -51,37 +62,50 @@ class TelegramBot:
                 one_time_keyboard=True,
                 resize_keyboard=True
             )
-            update.message.reply_text(
+            await update.message.reply_text(
                 "Welcome to Job Search Bot! Choose a site or 'all':",
                 reply_markup=reply_markup
             )
             return SELECT_SITE
         except Exception as e:
             print(f"Error in start handler: {e}")
-            update.message.reply_text("An error occurred. Please try again.")
+            await update.message.reply_text("An error occurred. Please try again.")
             return ConversationHandler.END
 
-    def handle_search(self, update, context):
+    async def handle_search(self, update, context):
         try:
+            # Send typing indicator
+            await context.bot.send_chat_action(
+                chat_id=update.effective_chat.id, 
+                action=ChatAction.TYPING
+            )
+            
             sites = context.user_data.get('sites', Settings.DEFAULT_SITE_CHOICES)
             keyword = update.message.text.strip()
             if not keyword:
-                update.message.reply_text("Please enter a keyword.")
+                await update.message.reply_text("Please enter a keyword.")
                 return ENTER_KEYWORD
 
-            update.message.reply_text("Searching for jobs...")
+            await update.message.reply_text("Searching for jobs...")
+            
+            # Send typing indicator again during search
+            await context.bot.send_chat_action(
+                chat_id=update.effective_chat.id, 
+                action=ChatAction.TYPING
+            )
+            
             results = self.search_service.search_all_sites(keyword, None, sites)
-            self._display_telegram_results(update, results)
+            await self._display_telegram_results(update, results)
             return ConversationHandler.END
         except Exception as e:
             print(f"Error in search handler: {e}")
-            update.message.reply_text("An error occurred during search. Please try again.")
+            await update.message.reply_text("An error occurred during search. Please try again.")
             return ConversationHandler.END
 
-    def _display_telegram_results(self, update, results):
+    async def _display_telegram_results(self, update, results):
         try:
             if not results or all(not r.get('jobs', []) for r in results.values() if isinstance(r, dict)):
-                update.message.reply_text("No jobs found. Try different parameters.")
+                await update.message.reply_text("No jobs found. Try different parameters.")
                 return
 
             message = [f"Total search time: {results['global_time']:.0f} ms\n"]
@@ -101,25 +125,31 @@ class TelegramBot:
             max_length = 4096
             full_message = '\n'.join(message)
             for i in range(0, len(full_message), max_length):
-                update.message.reply_text(full_message[i:i + max_length])
+                await update.message.reply_text(full_message[i:i + max_length])
         except Exception as e:
             print(f"Error displaying results: {e}")
-            update.message.reply_text("An error occurred while displaying results.")
+            await update.message.reply_text("An error occurred while displaying results.")
 
-    def handle_site_selection(self, update, context):
+    async def handle_site_selection(self, update, context):
         try:
+            # Send typing indicator
+            await context.bot.send_chat_action(
+                chat_id=update.effective_chat.id, 
+                action=ChatAction.TYPING
+            )
+            
             site = update.message.text.lower()
             if site == 'all':
                 context.user_data['sites'] = Settings.DEFAULT_SITE_CHOICES
             else:
                 context.user_data['sites'] = [site]
-            update.message.reply_text("Please enter a job keyword to search.")
+            await update.message.reply_text("Please enter a job keyword to search.")
             return ENTER_KEYWORD
         except Exception as e:
             print(f"Error in site selection: {e}")
-            update.message.reply_text("An error occurred. Please try again.")
+            await update.message.reply_text("An error occurred. Please try again.")
             return ConversationHandler.END
 
-    def cancel(self, update, context):
-        update.message.reply_text("Operation cancelled. Use /start to begin again.")
+    async def cancel(self, update, context):
+        await update.message.reply_text("Operation cancelled. Use /start to begin again.")
         return ConversationHandler.END
