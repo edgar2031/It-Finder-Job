@@ -3,7 +3,8 @@ import os
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from telegram import InlineQueryResultArticle, InputTextMessageContent
-from telegram.ext import ContextTypes, Update
+from telegram import Update
+from telegram.ext import ContextTypes
 from services.search_service import JobSearchService
 from settings import Settings
 from logger import Logger
