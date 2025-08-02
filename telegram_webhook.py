@@ -1,4 +1,3 @@
-# telegram_webhook.py
 import os
 import requests
 from dotenv import load_dotenv

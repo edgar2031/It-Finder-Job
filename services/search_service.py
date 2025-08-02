@@ -1,12 +1,14 @@
-from job_sites.hh import HHSite
-from job_sites.geekjob import GeekJobSite
-from logger import Logger
-from settings import Settings
-import time
 import concurrent.futures
+import time
 from typing import Dict, List, Optional, Union
 
+from job_sites.geekjob import GeekJobSite
+from job_sites.hh import HHSite
+from logger import Logger
+from settings import Settings
+
 logger = Logger.get_logger(__name__, file_prefix='search')
+
 
 class JobSearchService:
     def __init__(self):

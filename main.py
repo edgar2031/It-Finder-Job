@@ -1,4 +1,3 @@
-# main.py
 from bot import JobSearchBot
 from logger import Logger
 

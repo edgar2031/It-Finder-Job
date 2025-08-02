@@ -1,5 +1,5 @@
-# controllers/search_controller.py
 from flask import jsonify, request
+
 from services.search_service import JobSearchService
 from settings import Settings
 

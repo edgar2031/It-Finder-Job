@@ -1,6 +1,7 @@
 import json
 import os
 
+
 class Settings:
     # Language configuration
     SUPPORTED_LANGUAGES = ['en', 'ru']
@@ -72,7 +73,8 @@ class Settings:
     @classmethod
     def get_site_name(cls, site_id, language=None):
         """Get localized site name"""
-        return cls.get_translation('sites', site_id, language) or cls.AVAILABLE_SITES.get(site_id, {}).get('name', site_id)
+        return cls.get_translation('sites', site_id, language) or cls.AVAILABLE_SITES.get(site_id, {}).get('name',
+                                                                                                           site_id)
 
     @classmethod
     def get_experience_levels(cls, language=None):

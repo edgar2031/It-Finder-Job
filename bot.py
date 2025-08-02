@@ -1,11 +1,12 @@
-from job_sites.hh import HHSite
 from job_sites.geekjob import GeekJobSite
-from services.search_service import JobSearchService
+from job_sites.hh import HHSite
 from logger import Logger
-from settings import Settings
 from services.hh_location_service import HHLocationService
+from services.search_service import JobSearchService
+from settings import Settings
 
 logger = Logger.get_logger(__name__, file_prefix='cli')
+
 
 class JobSearchBot:
     def __init__(self):
@@ -129,7 +130,8 @@ class JobSearchBot:
                                     loc_id = list(matches.keys())[int(choice) - 1]
                                     selected_locations.append(loc_id)
                                     print(f"Added: {self.location_service.get_location_name(loc_id)}")
-                                    logger.info(f"User added location: {self.location_service.get_location_name(loc_id)}")
+                                    logger.info(
+                                        f"User added location: {self.location_service.get_location_name(loc_id)}")
                         else:
                             print(f"No locations found matching: {selection}")
                             logger.warning(f"No locations found for: {selection}")
@@ -259,7 +261,8 @@ class JobSearchBot:
 
                 if key == 'experience':
                     if val not in Settings.get_experience_levels():
-                        print(f"Invalid experience value. Options: {', '.join(Settings.get_experience_levels().keys())}")
+                        print(
+                            f"Invalid experience value. Options: {', '.join(Settings.get_experience_levels().keys())}")
                         logger.warning(f"Invalid experience value: {val}")
                         invalid_params = True
                         break
@@ -332,9 +335,9 @@ class JobSearchBot:
         logger.debug("Displayed popular locations")
 
     def run(self):
-        print(f"\n{'='*50}")
+        print(f"\n{'=' * 50}")
         print(f"{' Job Search Bot ':=^50}")
-        print(f"{'='*50}\n")
+        print(f"{'=' * 50}\n")
         logger.info("Starting CLI Job Search Bot")
 
         while True:
@@ -350,7 +353,8 @@ class JobSearchBot:
 
             keyword, location, extra_params = params
             print(f"\nSearching for: '{keyword}'")
-            print(f"Locations: {'Удалённая работа' if location == 'remote' else ', '.join(self.location_service.get_location_name(loc) for loc in location.split(','))}")
+            print(
+                f"Locations: {'Удалённая работа' if location == 'remote' else ', '.join(self.location_service.get_location_name(loc) for loc in location.split(','))}")
             logger.info(f"Starting search: keyword={keyword}, locations={location}")
 
             if extra_params:
@@ -369,9 +373,9 @@ class JobSearchBot:
             logger.info("No jobs found")
             return
 
-        print(f"\n{'='*50}")
+        print(f"\n{'=' * 50}")
         print(f"{' Job Search Results ':=^50}")
-        print(f"{'='*50}")
+        print(f"{'=' * 50}")
         print(f"\nTotal search time: {results['global_time']:.0f} ms\n")
         logger.info(f"Search completed in {results['global_time']:.0f} ms")
 
@@ -383,7 +387,7 @@ class JobSearchBot:
             if jobs:
                 status = ""
                 site_display_name = next((s.name for s in self.sites.values() if s.name.lower() == site_name.lower()),
-                                      Settings.AVAILABLE_SITES.get(site_name, {}).get('name', site_name))
+                                         Settings.AVAILABLE_SITES.get(site_name, {}).get('name', site_name))
                 print(f"\n{status} {site_display_name} "
                       f"({result.get('timing', 0):.0f} ms)")
                 print("-" * 60)
@@ -392,7 +396,7 @@ class JobSearchBot:
                 for i, job in enumerate(jobs, 1):
                     print(f"\n{i}. {job}")
 
-        print(f"\n{'='*50}")
+        print(f"\n{'=' * 50}")
         print(f"{' Search Complete ':=^50}")
-        print(f"{'='*50}\n")
+        print(f"{'=' * 50}\n")
         logger.info("Search results displayed")

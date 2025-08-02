@@ -1,10 +1,12 @@
 # services/hh_location_service.py
-import requests
 import json
 import os
 from datetime import datetime
-from logger import Logger
+
+import requests
+
 from config import Config
+from logger import Logger
 
 # Initialize logger with custom prefix
 logger = Logger.get_logger(__name__, 'hh-location-service')

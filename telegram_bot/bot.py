@@ -1,7 +1,8 @@
 import os
+
 from dotenv import load_dotenv
-from telegram.ext import Application, ConversationHandler, CommandHandler, MessageHandler, filters
 from telegram import ReplyKeyboardMarkup
+from telegram.ext import Application, ConversationHandler
 
 from job_sites import HHSite, GeekJobSite
 from services.hh_location_service import HHLocationService
@@ -10,6 +11,7 @@ from settings import Settings
 
 # Define conversation states
 SELECT_SITE, ENTER_KEYWORD = range(2)
+
 
 class TelegramBot:
     def __init__(self):

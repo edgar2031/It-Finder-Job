@@ -1,12 +1,14 @@
-# controllers/inline_query_controller.py
-import os
 import asyncio
+import os
 from concurrent.futures import ThreadPoolExecutor
+
 from telegram import InlineQueryResultArticle, InputTextMessageContent
-from telegram.ext import ContextTypes, Update
+from telegram import Update
+from telegram.ext import ContextTypes
+
+from logger import Logger
 from services.search_service import JobSearchService
 from settings import Settings
-from logger import Logger
 
 logger = Logger.get_logger(__name__, file_prefix='inline_query')
 
@@ -69,7 +71,8 @@ class InlineQueryController:
 
             await update.inline_query.answer(inline_results, cache_time=30)
             total_jobs = sum(len(r['jobs']) for r in results_data.get('results', {}).values())
-            logger.info(f"Inline query completed for user {user_id}, keyword: {query}, found {total_jobs} jobs, returned {len(inline_results)} results")
+            logger.info(
+                f"Inline query completed for user {user_id}, keyword: {query}, found {total_jobs} jobs, returned {len(inline_results)} results")
 
         except Exception as e:
             logger.error(f"Inline query error for user {user_id}: {e}")
@@ -100,7 +103,8 @@ class InlineQueryController:
                     if site_name != 'global_time' and isinstance(result, dict)
                 }
             }
-            logger.info(f"Search request completed for keyword: {keyword}, found {sum(len(r['jobs']) for r in formatted_results['results'].values())} jobs")
+            logger.info(
+                f"Search request completed for keyword: {keyword}, found {sum(len(r['jobs']) for r in formatted_results['results'].values())} jobs")
             return formatted_results
         except Exception as e:
             logger.error(f"Error in _search_jobs for keyword: {keyword}: {e}")

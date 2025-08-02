@@ -1,18 +1,19 @@
+import asyncio
+import logging
 import os
 import socket
-import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
-import logging
-from flask import Flask, request, jsonify
 from dotenv import load_dotenv
+from flask import Flask, request, jsonify
 from telegram import Update
 from telegram.ext import Application, CommandHandler, InlineQueryHandler, ContextTypes
+
+from controllers.inline_query_controller import inline_query_controller
+from logger import Logger
 from services.search_service import JobSearchService
 from settings import Settings
-from logger import Logger
-from controllers.inline_query_controller import inline_query_controller
 
 logger = Logger.get_logger(__name__, file_prefix='server')
 
@@ -37,6 +38,7 @@ except Exception as e:
     telegram_app = None
     telegram_loop = None
 
+
 def search_jobs(keyword):
     """Search jobs using JobSearchService."""
     try:
@@ -56,11 +58,13 @@ def search_jobs(keyword):
                 } for site_name, result in results.items() if site_name != 'global_time' and isinstance(result, dict)
             }
         }
-        logger.info(f"Search request completed for keyword: {keyword}, sites: {sites}, found {sum(len(r['jobs']) for r in formatted_results['results'].values())} jobs")
+        logger.info(
+            f"Search request completed for keyword: {keyword}, sites: {sites}, found {sum(len(r['jobs']) for r in formatted_results['results'].values())} jobs")
         return formatted_results
     except Exception as e:
         logger.error(f"Error in search_jobs for keyword: {keyword}: {e}")
         return {"error": str(e)}
+
 
 # Webhook route
 @app.route('/webhook', methods=['POST'])
@@ -92,6 +96,7 @@ def telegram_webhook():
         logger.error(f"Webhook error (User: {user_id}): {str(e)}")
         return jsonify({'status': 'error', 'message': str(e)}), 500
 
+
 # Command handler
 async def handle_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
     try:
@@ -109,7 +114,8 @@ async def handle_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         if "error" in results:
             await update.message.reply_text(f"🚨 Error: {results['error']}")
-            logger.error(f"Search command failed for user {update.effective_user.id}, keyword: {keyword}: {results['error']}")
+            logger.error(
+                f"Search command failed for user {update.effective_user.id}, keyword: {keyword}: {results['error']}")
             return
 
         response = ["🔍 Search Results:"]
@@ -121,15 +127,18 @@ async def handle_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
         message = '\n'.join(response) if len(response) > 1 else "No jobs found"
         await update.message.reply_text(message, disable_web_page_preview=True)
-        logger.info(f"Displayed {sum(len(r['jobs']) for r in results.get('results', {}).values())} jobs for user {update.effective_user.id}, keyword: {keyword}")
+        logger.info(
+            f"Displayed {sum(len(r['jobs']) for r in results.get('results', {}).values())} jobs for user {update.effective_user.id}, keyword: {keyword}")
     except Exception as e:
         logger.error(f"Search command error for user {update.effective_user.id}: {e}")
         await update.message.reply_text(f"🚨 Error: {str(e)}")
+
 
 # Register handlers
 if telegram_app:
     telegram_app.add_handler(CommandHandler("search", handle_search))
     telegram_app.add_handler(InlineQueryHandler(inline_query_controller.handle_inline_query))
+
 
 def get_server_info():
     """Server configuration information"""
@@ -146,6 +155,7 @@ def get_server_info():
         }
     }
 
+
 def print_startup_message(info):
     """Display server startup info"""
     print("\n" + "=" * 50)
@@ -160,6 +170,7 @@ def print_startup_message(info):
     for name, endpoint in info['endpoints'].items():
         print(f"- {name:<10} {endpoint}")
     print("=" * 50 + "\n")
+
 
 def run_server():
     server_info = get_server_info()
@@ -189,6 +200,7 @@ def run_server():
             port=server_info['port'],
             debug=server_info['debug']
         )
+
 
 if __name__ == '__main__':
     run_server()

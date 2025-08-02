@@ -1,7 +1,7 @@
 from telegram.ext import CommandHandler, MessageHandler, filters, ConversationHandler
-from telegram_bot.bot import TelegramBot
 
 SELECT_SITE, ENTER_KEYWORD = range(2)
+
 
 def search_command(update, context):
     """Handle /search <keyword> command."""
@@ -14,6 +14,7 @@ def search_command(update, context):
     update.message.reply_text(f"Searching for '{keyword}'...")
     results = bot.search_service.search_all_sites(keyword, None, sites)
     bot._display_telegram_results(update, results)
+
 
 def setup_handlers(dp, bot):
     dp.add_handler(CommandHandler("start", bot.start))

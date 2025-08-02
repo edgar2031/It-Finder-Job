@@ -1,5 +1,5 @@
 from telegram.ext import CommandHandler
-from telegram_bot.bot import TelegramBot
+
 
 def help_command(update, context):
     """Send help message"""
@@ -11,6 +11,7 @@ def help_command(update, context):
         "Usage: Select a site (hh, geekjob, all) and enter a keyword to search for jobs."
     )
     update.message.reply_text(help_text)
+
 
 def setup_commands(dp, bot):
     dp.add_handler(CommandHandler("help", help_command))

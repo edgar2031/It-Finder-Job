@@ -10,7 +10,7 @@ def format_telegram_results(bot, results):
         jobs = result.get('jobs', [])
         if jobs:
             site_display_name = next((s.name for s in bot.sites.values() if s.name.lower() == site_name.lower()),
-                                  bot.settings.AVAILABLE_SITES.get(site_name, {}).get('name', site_name))
+                                     bot.settings.AVAILABLE_SITES.get(site_name, {}).get('name', site_name))
             message.append(f"\n{site_display_name} ({result.get('timing', 0):.0f} ms):")
             for i, job in enumerate(jobs[:5], 1):  # Limit to 5 jobs
                 message.append(f"{i}. {job}")
