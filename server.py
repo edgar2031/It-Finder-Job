@@ -7,11 +7,12 @@ from datetime import datetime
 import logging
 from flask import Flask, request, jsonify
 from dotenv import load_dotenv
-from telegram import Update, InlineQueryResultArticle, InputTextMessageContent
+from telegram import Update
 from telegram.ext import Application, CommandHandler, InlineQueryHandler, ContextTypes
 from services.search_service import JobSearchService
 from settings import Settings
 from logger import Logger
+from controllers.inline_query_controller import handle_inline_query
 
 logger = Logger.get_logger(__name__, file_prefix='server')
 
@@ -125,140 +126,7 @@ async def handle_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         logger.error(f"Search command error for user {update.effective_user.id}: {e}")
         await update.message.reply_text(f"🚨 Error: {str(e)}")
 
-# Inline query handler
-async def handle_inline_query(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Handle inline queries for job search"""
-    try:
-        query = update.inline_query.query.strip()
-        user_id = update.effective_user.id if update.effective_user else 'unknown'
-        
-        if not query:
-            # Show help message when query is empty
-            results = [
-                InlineQueryResultArticle(
-                    id="help",
-                    title="🔍 Job Search",
-                    description="Type a job keyword to search for jobs",
-                    input_message_content=InputTextMessageContent(
-                        message_text="Type a job keyword after @your_bot_username to search for jobs"
-                    )
-                )
-            ]
-            await update.inline_query.answer(results, cache_time=0)
-            return
 
-        logger.debug(f"Processing inline query for user {user_id}, keyword: {query}")
-        
-        # Search for jobs using the same search function
-        results_data = await asyncio.get_event_loop().run_in_executor(
-            executor,
-            lambda: search_jobs(query)
-        )
-
-        if "error" in results_data:
-            error_result = [
-                InlineQueryResultArticle(
-                    id="error",
-                    title="🚨 Search Error",
-                    description=f"Error: {results_data['error']}",
-                    input_message_content=InputTextMessageContent(
-                        message_text=f"🚨 Search Error: {results_data['error']}"
-                    )
-                )
-            ]
-            await update.inline_query.answer(error_result, cache_time=0)
-            logger.error(f"Inline query failed for user {user_id}, keyword: {query}: {results_data['error']}")
-            return
-
-        # Format results for inline query
-        inline_results = []
-        result_id = 0
-        
-        for site, data in results_data.get('results', {}).items():
-            jobs = data.get('jobs', [])
-            if not jobs:
-                continue
-                
-            # Add site summary result
-            site_name = Settings.get_site_name(site)
-            job_count = len(jobs)
-            timing = data.get('timing_ms', 0)
-            
-            # Create a summary message for this site
-            summary_text = f"🏢 {site_name} ({timing:.0f} ms)\n"
-            summary_text += f"Found {job_count} jobs for '{query}':\n\n"
-            
-            for idx, job in enumerate(jobs[:5], 1):  # Show max 5 jobs in summary
-                summary_text += f"{idx}. {job}\n"
-            
-            if job_count > 5:
-                summary_text += f"\n... and {job_count - 5} more jobs"
-            
-            inline_results.append(
-                InlineQueryResultArticle(
-                    id=f"site_{result_id}",
-                    title=f"🏢 {site_name} - {job_count} jobs",
-                    description=f"Found {job_count} jobs in {timing:.0f}ms",
-                    input_message_content=InputTextMessageContent(
-                        message_text=summary_text,
-                        disable_web_page_preview=True
-                    )
-                )
-            )
-            result_id += 1
-            
-            # Add individual job results (limit to first 3 jobs per site)
-            for idx, job in enumerate(jobs[:3]):
-                inline_results.append(
-                    InlineQueryResultArticle(
-                        id=f"job_{result_id}",
-                        title=f"📋 {job.split(' - ')[0] if ' - ' in job else job[:50]}",
-                        description=f"From {site_name}",
-                        input_message_content=InputTextMessageContent(
-                            message_text=f"🔍 Job from {site_name}:\n\n{job}",
-                            disable_web_page_preview=True
-                        )
-                    )
-                )
-                result_id += 1
-                
-                # Telegram inline query has a limit of 50 results
-                if len(inline_results) >= 50:
-                    break
-            
-            if len(inline_results) >= 50:
-                break
-
-        # If no jobs found
-        if not inline_results:
-            inline_results = [
-                InlineQueryResultArticle(
-                    id="no_results",
-                    title="❌ No jobs found",
-                    description=f"No jobs found for '{query}'",
-                    input_message_content=InputTextMessageContent(
-                        message_text=f"❌ No jobs found for '{query}'\n\nTry different keywords or check spelling."
-                    )
-                )
-            ]
-
-        await update.inline_query.answer(inline_results, cache_time=30)
-        total_jobs = sum(len(r['jobs']) for r in results_data.get('results', {}).values())
-        logger.info(f"Inline query completed for user {user_id}, keyword: {query}, found {total_jobs} jobs, returned {len(inline_results)} results")
-        
-    except Exception as e:
-        logger.error(f"Inline query error for user {user_id}: {e}")
-        error_result = [
-            InlineQueryResultArticle(
-                id="error",
-                title="🚨 Error",
-                description="An error occurred while searching",
-                input_message_content=InputTextMessageContent(
-                    message_text=f"🚨 An error occurred while searching: {str(e)}"
-                )
-            )
-        ]
-        await update.inline_query.answer(error_result, cache_time=0)
 
 # Register handlers
 if telegram_app:
