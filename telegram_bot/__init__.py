@@ -1,1 +1,3 @@
-__all__ = ['handlers', 'commands', 'utils']
+from .bot import TelegramBot
+
+__all__ = ['TelegramBot']

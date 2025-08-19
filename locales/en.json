@@ -1,4 +1,46 @@
 {
+  "inline_query": {
+    "help_title": "Job Search",
+    "help_description": "Type a skill or job title to find the best opportunities",
+    "help_message": "Welcome to IT Job Finder! 🚀\n\nUse this bot to search for IT jobs across multiple platforms.\n\nSimply type a skill or job title after {bot_username} to find relevant job opportunities.",
+    "examples": "Popular searches",
+    "timeout_title": "Search Timeout",
+    "timeout_description": "Search took too long, please try again",
+    "timeout_message": "Search for '{query}' took too long. Please try a more specific search term.",
+    "timeout_suggestions": "Suggestions",
+    "shorter_keywords": "Use shorter, more specific keywords",
+    "different_terms": "Try different search terms",
+    "use_search_command": "Use /search command for detailed results",
+    "error_title": "Search Error",
+    "error_message": "An error occurred during search",
+    "error_suggestion": "Please try a different keyword or check your internet connection",
+    "unexpected_error_title": "Unexpected Error",
+    "unexpected_error_description": "An error occurred while searching",
+    "unexpected_error_message": "An error occurred while searching: {error}",
+    "contact_support": "Please try again or contact support",
+    "answer_error_title": "Answer Error",
+    "answer_error_description": "Failed to send results",
+    "answer_error_message": "Failed to send results: {error}",
+    "try_again": "Please try again",
+    "remote": "Remote",
+    "found_jobs": "Found {count} jobs for '{query}'",
+    "view_all_jobs": "View all {count} jobs from {site}",
+    "summary_title": "Jobs found for '{query}'",
+    "summary_description": "Found {total_jobs} jobs across {total_sites} sites",
+    "summary_title_simplified": "Jobs found (simplified results)",
+    "summary_description_simplified": "Found {total_jobs} jobs across {total_sites} sites",
+    "search_results": "Search Results for '{query}'",
+    "search_results_simplified": "Search Results (Simplified)",
+    "total_jobs": "Total Jobs",
+    "sites_searched": "Sites Searched",
+    "jobs_by_site": "Jobs by Site",
+    "jobs_count": "{count} jobs",
+    "response_time": "Response Time",
+    "click_to_see_all": "Click to see all jobs",
+    "simplified_results": "Simplified results",
+    "click_individual_jobs": "Click on individual jobs below to view details",
+    "showing_simplified": "Showing simplified results due to timeout"
+  },
   "experience": {
     "noExperience": "No experience",
     "between1And3": "1-3 years",
@@ -40,11 +82,28 @@
       "work_format": "Work Format",
       "salary": "Salary",
       "link": "Link",
-      "publication_date": "Publication date"
+      "publication_date": "Publication date",
+      "experience": "Experience",
+      "employment": "Employment",
+      "requirement": "Requirements",
+      "responsibility": "Responsibilities",
+      "skills": "Skills",
+      "benefits": "Benefits"
     },
     "salary": {
       "thousand_rub": "k RUB",
-      "thousand_usd": "k USD"
+      "thousand_usd": "k USD",
+      "from": "from",
+      "to": "to",
+      "per_month": "per month",
+      "per_year": "per year"
+    },
+    "work_format": {
+      "remote": "Remote",
+      "office": "Office",
+      "hybrid": "Hybrid",
+      "parttime": "Part-time",
+      "relocate": "Relocation"
     }
   },
   "hh": {
@@ -66,15 +125,37 @@
       "link": "Link",
       "gross": " (gross)",
       "net": " (net)",
-      "publication_date": "Publication date"
+      "publication_date": "Publication date",
+      "requirement": "Requirements",
+      "responsibility": "Responsibilities",
+      "skills": "Skills",
+      "benefits": "Benefits",
+      "work_format": "Work Format"
     },
     "currencies": {
-      "RUR": "RUB",
-      "USD": "USD",
-      "EUR": "EUR",
-      "KZT": "KZT",
-      "UAH": "UAH",
-      "BYN": "BYN"
+      "RUR": "₽",
+      "USD": "$",
+      "EUR": "€",
+      "KZT": "₸"
+    },
+    "salary": {
+      "from": "from",
+      "to": "to",
+      "per_month": "per month",
+      "per_year": "per year",
+      "gross": " (gross)",
+      "net": " (net)"
+    },
+    "work_format": {
+      "remote": "Remote",
+      "office": "Office",
+      "hybrid": "Hybrid",
+      "fulltime": "Full-time",
+      "parttime": "Part-time"
     }
+  },
+  "messages": {
+    "vacancy_not_available": "Vacancy information not available.",
+    "formatting_error": "Error formatting vacancy information."
   }
 }

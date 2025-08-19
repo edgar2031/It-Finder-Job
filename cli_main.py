@@ -1,8 +1,8 @@
-from bot import JobSearchBot
-from logger import Logger
+from cli_bot import JobSearchBot
+from helpers import LoggerHelper
 
 # Initialize logger with module name and custom prefix
-logger = Logger.get_logger(__name__, 'job-search-bot')
+logger = LoggerHelper.get_logger(__name__, prefix='job-search-bot')
 
 
 def main():
@@ -18,11 +18,11 @@ def main():
 
     except KeyboardInterrupt:
         logger.warning("Bot stopped by user interrupt")
-        print("\nExiting Job Search Bot...")
+        logger.info("Exiting Job Search Bot...")
 
     except Exception as e:
         logger.exception("Fatal error in main execution")
-        print(f"\nA critical error occurred: {e}")
+        logger.error(f"A critical error occurred: {e}")
 
         # Additional error handling if needed
         logger.error("Shutting down due to fatal error",

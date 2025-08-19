@@ -1,184 +1,276 @@
-import concurrent.futures
+"""
+Job search service implementation.
+"""
+import asyncio
 import time
-from typing import Dict, List, Optional, Union
+from concurrent.futures import ThreadPoolExecutor
+from helpers import ConfigHelper, LoggerHelper, SettingsHelper
+from helpers.config import get_site_config
+from typing import Dict, List, Tuple, Any
+from job_sites import HHSite, GeekJobSite
 
-from job_sites.geekjob import GeekJobSite
-from job_sites.hh import HHSite
-from logger import Logger
-from settings import Settings
-
-logger = Logger.get_logger(__name__, file_prefix='search')
+logger = LoggerHelper.get_logger(__name__, prefix='search-service')
 
 
 class JobSearchService:
-    def __init__(self):
-        """Initialize the search service with available job sites."""
-        self.available_sites = {
-            'hh': HHSite(),
-            'geekjob': GeekJobSite()
-        }
-        self._validate_sites()
-
-    def _validate_sites(self):
-        """Validate that all configured sites are available and properly initialized."""
-        for site_id, site_info in Settings.AVAILABLE_SITES.items():
-            if site_info['enabled'] and site_id not in self.available_sites:
-                logger.warning(f"Configured site {site_id} is enabled but not implemented")
-
-    def _search_site(
-            self,
-            site_name: str,
-            keyword: str,
-            location: Optional[str] = None,
-            extra_params: Optional[Dict] = None
-    ) -> Dict:
+    """
+    Service for searching jobs across multiple job sites.
+    
+    This service coordinates job searches across different job sites,
+    handles concurrent requests, and aggregates results.
+    """
+    
+    def __init__(self, job_sites=None):
+        """Initialize the search service with job site instances"""
+        if job_sites is None:
+            # Fallback: create new instances if none provided
+            self.hh_site = HHSite()
+            self.geekjob_site = GeekJobSite()
+        else:
+            # Use provided instances
+            self.hh_site = job_sites.get('hh')
+            self.geekjob_site = job_sites.get('geekjob')
+            
+        self.max_workers = 4
+        self.executor = ThreadPoolExecutor(max_workers=self.max_workers)
+        
+    def search_all_sites(self, keyword: str, location: str = None, sites: List[str] = None) -> Dict[str, Any]:
         """
-        Search a single job site for vacancies.
-
+        Search for jobs across all specified sites.
+        
         Args:
-            site_name: Identifier of the job site
-            keyword: Search term for jobs
-            location: Location filter (optional)
-            extra_params: Additional search parameters (optional)
-
+            keyword (str): Search keyword
+            location (str): Location for search (optional)
+            sites (List[str]): List of site IDs to search (optional)
+            
         Returns:
-            Dictionary containing search results and metadata
+            Dict[str, Any]: Search results with metadata
         """
-        site = self.available_sites.get(site_name)
-        if not site:
-            error_msg = f"Site {site_name} not found in available sites"
-            logger.error(error_msg)
-            return {
-                'site': site_name,
-                'result': {
-                    'jobs': [f"Error: {error_msg}"],
-                    'timing': 0,
-                    'status': 'failed'
-                }
+        if sites is None:
+            sites = SettingsHelper.get_default_site_choices()
+            
+        start_time = time.perf_counter()
+        results = {
+            'keyword': keyword,
+            'location': location,
+            'sites': {},
+            'total_jobs': 0,
+            'global_time_ms': 0,
+            'metadata': {
+                'keyword': keyword,
+                'location': location,
+                'sites_requested': sites,
+                'timestamp': time.strftime('%Y-%m-%d %H:%M:%S'),
+                'total_jobs': 0,
+                'global_time_ms': 0
             }
-
-        site_start = time.perf_counter()
-
-        try:
-            jobs, timing = site.search_jobs(
-                keyword,
-                None if location == 'remote' else location,
-                {'schedule': 'remote'} if location == 'remote' and site_name == 'hh' else extra_params
-            )
-
-            if not jobs or any(isinstance(job, str) and "Error" in job for job in jobs):
-                raise ValueError("No valid jobs found")
-
-            return {
-                'site': site_name,
-                'result': {
+        }
+        
+        # Create search tasks for each site
+        search_tasks = {}
+        for site in sites:
+            if site == 'hh':
+                search_tasks[site] = self.executor.submit(
+                    self._search_hh, keyword, location
+                )
+            elif site == 'geekjob':
+                search_tasks[site] = self.executor.submit(
+                    self._search_geekjob, keyword, location
+                )
+        
+        # Collect results
+        for site, future in search_tasks.items():
+            try:
+                jobs, timing = future.result()
+                site_config = get_site_config(site)
+                site_name = site_config.get('name', site.title())
+                
+                results['sites'][site] = {
+                    'name': site_name,
                     'jobs': jobs,
-                    'timing': timing,
+                    'jobs_count': len(jobs),
+                    'timing_ms': timing * 1000,
                     'status': 'success'
                 }
-            }
-
-        except Exception as e:
-            logger.error(f"Error searching {site_name}: {e}", exc_info=True)
-            return {
-                'site': site_name,
-                'result': {
-                    'jobs': [f"Error: {str(e)}"],
-                    'timing': (time.perf_counter() - site_start) * 1000,
-                    'status': 'failed'
+                results['total_jobs'] += len(jobs)
+                
+            except Exception as e:
+                logger.error(f"Search failed for site {site}: {e}")
+                results['sites'][site] = {
+                    'name': site.title(),
+                    'jobs': [],
+                    'jobs_count': 0,
+                    'timing_ms': 0,
+                    'status': 'error',
+                    'error': str(e)
                 }
+        
+        # Calculate global timing
+        global_time = time.perf_counter() - start_time
+        results['global_time_ms'] = global_time * 1000
+        results['metadata']['total_jobs'] = results['total_jobs']
+        results['metadata']['global_time_ms'] = results['global_time_ms']
+        
+        logger.info(
+            f"Search completed for '{keyword}'",
+            extra={
+                'keyword': keyword,
+                'location': location,
+                'sites': sites,
+                'total_jobs': results['total_jobs'],
+                'global_time_ms': results['global_time_ms']
             }
-
-    def search_all_sites(
-            self,
-            keyword: str,
-            location: Optional[str] = None,
-            selected_sites: Optional[List[str]] = None,
-            extra_params: Optional[Dict] = None
-    ) -> Dict[str, Union[Dict, float]]:
-        """
-        Search all specified job sites for vacancies.
-
-        Args:
-            keyword: Search term for jobs
-            location: Location filter (optional)
-            selected_sites: List of site IDs to search (optional)
-            extra_params: Additional search parameters (optional)
-
-        Returns:
-            Dictionary containing results from all sites and timing information
-        """
-        if not keyword:
-            logger.warning("No keyword provided, using default '%s'", Settings.DEFAULT_KEYWORD)
-            keyword = Settings.DEFAULT_KEYWORD
-
-        selected_sites = selected_sites or Settings.DEFAULT_SITE_CHOICES
-        valid_sites = [s for s in selected_sites if s in self.available_sites]
-
-        if not valid_sites:
-            logger.error("No valid sites selected for search")
-            return {'global_time': 0}
-
-        results = {}
-        start_time = time.perf_counter()
-
-        logger.info(f"Searching {len(valid_sites)} sites for '{keyword}'...")
-
-        with concurrent.futures.ThreadPoolExecutor() as executor:
-            future_to_site = {
-                executor.submit(
-                    self._search_site,
-                    site_name,
-                    keyword,
-                    location,
-                    extra_params
-                ): site_name for site_name in valid_sites
-            }
-
-            for future in concurrent.futures.as_completed(future_to_site):
-                site_name = future_to_site[future]
-                try:
-                    data = future.result()
-                    results[site_name] = data['result']
-                    self._log_site_progress(
-                        len(results),
-                        len(valid_sites),
-                        site_name,
-                        data['result']['timing'],
-                        data['result']['status']
-                    )
-                except Exception as e:
-                    logger.error(f"Unexpected error processing {site_name}: {e}")
-                    results[site_name] = {
-                        'jobs': [f"Error: Unexpected processing error"],
-                        'timing': 0,
-                        'status': 'failed'
-                    }
-
-        end_time = time.perf_counter()
-        results['global_time'] = (end_time - start_time) * 1000
-        self._log_summary(results, len(valid_sites))
-
-        return results
-
-    def _log_site_progress(
-            self,
-            completed: int,
-            total: int,
-            site_name: str,
-            timing: float,
-            status: str
-    ) -> None:
-        """Log progress update for a single site search."""
-        status_text = "Success" if status == 'success' else "Partial results"
-        logger.info(f"{completed}/{total} {Settings.AVAILABLE_SITES[site_name]['name']} "
-                    f"({timing:.0f} ms) {status_text}")
-
-    def _log_summary(self, results: Dict, total_sites: int) -> None:
-        """Log search summary statistics."""
-        success_count = sum(
-            1 for r in results.values()
-            if isinstance(r, dict) and r.get('status') == 'success'
         )
-        logger.info(f"Search completed in {results['global_time']:.0f} ms - "
-                    f"{success_count}/{total_sites} sites successful")
+        
+        return results
+    
+    def _search_hh(self, keyword: str, location: str = None) -> Tuple[List[Dict], float]:
+        """
+        Search jobs on HeadHunter site.
+        
+        Args:
+            keyword (str): Search keyword
+            location (str): Location for search
+            
+        Returns:
+            Tuple[List[Dict], float]: List of job data with formatted text and timing
+        """
+        start_time = time.perf_counter()
+        jobs, _ = self.hh_site.search_jobs(keyword, location)
+        timing = time.perf_counter() - start_time
+        
+        # Convert formatted strings to job data structure
+        job_data = []
+        for job in jobs:
+            if isinstance(job, dict):
+                # If job is already a dict, use it as is
+                job_data.append(job)
+            else:
+                # If job is a string, create a job data structure
+                job_data.append({
+                    'raw': str(job),
+                    'formatted': str(job)
+                })
+        
+        logger.debug(f"HH search completed: {len(job_data)} jobs in {timing:.2f}s")
+        return job_data, timing
+    
+    def _search_geekjob(self, keyword: str, location: str = None) -> Tuple[List[Dict], float]:
+        """
+        Search jobs on GeekJob site.
+        
+        Args:
+            keyword (str): Search keyword
+            location (str): Location for search
+            
+        Returns:
+            Tuple[List[Dict], float]: List of job data with formatted text and timing
+        """
+        start_time = time.perf_counter()
+        jobs, _ = self.geekjob_site.search_jobs(keyword, location)
+        timing = time.perf_counter() - start_time
+        
+        # Filter out error messages and convert to job data structure
+        job_data = []
+        for job in jobs:
+            # Skip error messages
+            if any(error_msg in str(job) for error_msg in [
+                'Вакансии не найдены', 'No jobs found', 'Error:', 'Failed to process'
+            ]):
+                continue
+            
+            if isinstance(job, dict):
+                # If job is already a dict, use it as is
+                job_data.append(job)
+            else:
+                # If job is a string, create a job data structure
+                job_data.append({
+                    'raw': str(job),
+                    'formatted': str(job)
+                })
+        
+        logger.debug(f"GeekJob search completed: {len(job_data)} actual jobs in {timing:.2f}s")
+        return job_data, timing
+    
+    def search_single_site(self, site: str, keyword: str, location: str = None) -> Dict[str, Any]:
+        """
+        Search jobs on a single site.
+        
+        Args:
+            site (str): Site ID ('hh' or 'geekjob')
+            keyword (str): Search keyword
+            location (str): Location for search
+            
+        Returns:
+            Dict[str, Any]: Search results for the single site
+        """
+        start_time = time.perf_counter()
+        
+        try:
+            if site == 'hh':
+                jobs, timing = self._search_hh(keyword, location)
+            elif site == 'geekjob':
+                jobs, timing = self._search_geekjob(keyword, location)
+            else:
+                raise ValueError(f"Unknown site: {site}")
+            
+            site_config = get_site_config(site)
+            site_name = site_config.get('name', site.title())
+            
+            global_time = time.perf_counter() - start_time
+            
+            return {
+                'site': site,
+                'name': site_name,
+                'jobs': jobs,
+                'jobs_count': len(jobs),
+                'timing_ms': timing * 1000,
+                'global_time_ms': global_time * 1000,
+                'status': 'success'
+            }
+            
+        except Exception as e:
+            logger.error(f"Single site search failed for {site}: {e}")
+            return {
+                'site': site,
+                'name': site.title(),
+                'jobs': [],
+                'jobs_count': 0,
+                'timing_ms': 0,
+                'global_time_ms': 0,
+                'status': 'error',
+                'error': str(e)
+            }
+    
+    def get_available_sites(self) -> List[str]:
+        """
+        Get list of available job sites.
+        
+        Returns:
+            List[str]: List of available site IDs
+        """
+        return SettingsHelper.get_default_site_choices()
+    
+    def get_site_info(self, site: str) -> Dict[str, Any]:
+        """
+        Get information about a specific site.
+        
+        Args:
+            site (str): Site ID
+            
+        Returns:
+            Dict[str, Any]: Site information
+        """
+        site_config = get_site_config(site)
+        return {
+            'id': site,
+            'name': site_config.get('name', site.title()),
+            'api_base': site_config.get('api_base', ''),
+            'web_base': site_config.get('web_base', ''),
+            'enabled': True
+        }
+    
+    def shutdown(self):
+        """Shutdown the search service and cleanup resources."""
+        self.executor.shutdown(wait=True)
+        logger.info("JobSearchService shutdown complete") 

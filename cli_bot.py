@@ -1,17 +1,21 @@
-from job_sites.geekjob import GeekJobSite
-from job_sites.hh import HHSite
-from logger import Logger
-from services.hh_location_service import HHLocationService
-from services.search_service import JobSearchService
-from settings import Settings
+"""
+CLI bot implementation.
+"""
+import asyncio
+import sys
+from pathlib import Path
+from helpers import Settings, LoggerHelper
+from job_sites import GeekJobSite, HHSite
+from services import HHLocationService, JobSearchService, JobResultsLogger
 
-logger = Logger.get_logger(__name__, file_prefix='cli')
+logger = LoggerHelper.get_logger(__name__, prefix='cli')
 
 
 class JobSearchBot:
     def __init__(self):
         self.search_service = JobSearchService()
         self.location_service = HHLocationService()
+        self.job_results_logger = JobResultsLogger()
         self.sites = {
             'hh': HHSite(),
             'geekjob': GeekJobSite()
@@ -22,7 +26,7 @@ class JobSearchBot:
     def _print_available_sites(self):
         print("\nAvailable job sites:")
         for site_id, site in self.sites.items():
-            site_name = getattr(site, 'name', Settings.AVAILABLE_SITES[site_id]['name'])
+            site_name = getattr(site, 'name', Settings.get_available_sites()[site_id]['name'])
             print(f"  {site_id} - {site_name}")
         print("  all - Search all sites (default)")
         print("  (Press Enter for default: all sites)")
@@ -37,7 +41,7 @@ class JobSearchBot:
 
             if not choice:
                 logger.info("User selected default site choices")
-                return Settings.DEFAULT_SITE_CHOICES
+                return Settings.get_default_site_choices()
 
             if choice in ['quit', 'exit', 'q']:
                 logger.info("User chose to exit")
@@ -46,7 +50,7 @@ class JobSearchBot:
             if choice == 'clear':
                 print("Cleared selection, using default sites")
                 logger.info("User cleared site selection, using default sites")
-                return Settings.DEFAULT_SITE_CHOICES
+                return Settings.get_default_site_choices()
 
             selected = Settings.validate_site_choice(choice)
             if selected:
@@ -176,9 +180,9 @@ class JobSearchBot:
                 logger.info(f"User added location: {self.location_service.get_location_name(loc_id)}")
 
         if not selected_locations:
-            selected_locations = [Settings.DEFAULT_LOCATION]
-            print(f"Using default location: {self.location_service.get_location_name(Settings.DEFAULT_LOCATION)}")
-            logger.info(f"Using default location: {self.location_service.get_location_name(Settings.DEFAULT_LOCATION)}")
+            selected_locations = [Settings.get_default_location()]
+            print(f"Using default location: {self.location_service.get_location_name(Settings.get_default_location())}")
+            logger.info(f"Using default location: {self.location_service.get_location_name(Settings.get_default_location())}")
 
         location = 'remote' if 'remote' in selected_locations else ','.join(selected_locations)
 
@@ -365,6 +369,10 @@ class JobSearchBot:
 
             print("\nSearching for jobs...")
             results = self.search_service.search_all_sites(keyword, location, sites, extra_params)
+            
+            # Log job results for CLI
+            self.job_results_logger.log_search_results(keyword, results, None, "cli")
+            
             self._display_results(results)
 
     def _display_results(self, results):
@@ -387,16 +395,132 @@ class JobSearchBot:
             if jobs:
                 status = ""
                 site_display_name = next((s.name for s in self.sites.values() if s.name.lower() == site_name.lower()),
-                                         Settings.AVAILABLE_SITES.get(site_name, {}).get('name', site_name))
+                                         Settings.get_available_sites().get(site_name, {}).get('name', site_name))
                 print(f"\n{status} {site_display_name} "
                       f"({result.get('timing', 0):.0f} ms)")
                 print("-" * 60)
                 logger.info(f"Displaying {len(jobs)} jobs from {site_display_name}")
 
-                for i, job in enumerate(jobs, 1):
-                    print(f"\n{i}. {job}")
+                # Use formatted_jobs for display, fallback to jobs if not available
+                display_jobs = result.get('formatted_jobs', jobs)
+                
+                for i, job in enumerate(display_jobs, 1):
+                    # Ensure job is a string for display
+                    if isinstance(job, dict):
+                        job_text = job.get('raw', str(job))
+                    else:
+                        job_text = str(job)
+                    print(f"\n{i}. {job_text}")
 
         print(f"\n{'=' * 50}")
         print(f"{' Search Complete ':=^50}")
         print(f"{'=' * 50}\n")
         logger.info("Search results displayed")
+
+    def _perform_search(self, params):
+        """Perform search with given parameters"""
+        try:
+            keyword = params.get('keyword', '')
+            location = params.get('location', '')
+            sites = params.get('sites', Settings.get_default_site_choices())
+            extra_params = params.get('extra_params', {})
+            
+            logger.info(f"Performing search: keyword={keyword}, location={location}, sites={sites}")
+            
+            results = self.search_service.search_all_sites(keyword, location, sites, extra_params)
+            
+            # Log job results
+            self.job_results_logger.log_search_results(keyword, results, None, "cli")
+            
+            return results
+        except Exception as e:
+            logger.error(f"Error performing search: {e}")
+            return None
+
+    def _validate_search_parameters(self, params):
+        """Validate search parameters"""
+        try:
+            # Check required fields
+            if not params.get('keyword'):
+                return False
+            
+            # Check sites
+            sites = params.get('sites', [])
+            if not sites:
+                return False
+            
+            # Validate sites
+            for site in sites:
+                if site not in Settings.get_available_sites():
+                    return False
+            
+            return True
+        except Exception as e:
+            logger.error(f"Error validating parameters: {e}")
+            return False
+
+    def _extract_job_info(self, job_text):
+        """Extract job information from text"""
+        try:
+            job_info = {
+                'title': '',
+                'company': '',
+                'location': '',
+                'salary': '',
+                'description': '',
+                'link': '',
+                'raw': job_text
+            }
+            
+            # Simple extraction logic
+            lines = job_text.split('\n')
+            for line in lines:
+                line = line.strip()
+                if not line:
+                    continue
+                
+                # Extract title (usually first non-empty line)
+                if not job_info['title'] and len(line) > 3:
+                    job_info['title'] = line
+                # Extract company (look for patterns)
+                elif 'company' in line.lower() or 'inc' in line.lower() or 'ltd' in line.lower():
+                    job_info['company'] = line
+                # Extract location
+                elif any(city in line.lower() for city in ['москва', 'спб', 'санкт-петербург', 'remote']):
+                    job_info['location'] = line
+                # Extract salary
+                elif any(currency in line.lower() for currency in ['₽', '$', '€', 'руб']):
+                    job_info['salary'] = line
+            
+            return job_info
+        except Exception as e:
+            logger.error(f"Error extracting job info: {e}")
+            return {'raw': job_text}
+
+    def _format_job_text(self, job_text):
+        """Format job text for display"""
+        try:
+            if isinstance(job_text, dict):
+                # If it's already a dict, format it
+                job_info = job_text
+            else:
+                # Extract info from text
+                job_info = self._extract_job_info(str(job_text))
+            
+            # Format the job text
+            formatted = []
+            if job_info.get('title'):
+                formatted.append(f"Title: {job_info['title']}")
+            if job_info.get('company'):
+                formatted.append(f"Company: {job_info['company']}")
+            if job_info.get('location'):
+                formatted.append(f"Location: {job_info['location']}")
+            if job_info.get('salary'):
+                formatted.append(f"Salary: {job_info['salary']}")
+            if job_info.get('description'):
+                formatted.append(f"Description: {job_info['description']}")
+            
+            return '\n'.join(formatted) if formatted else str(job_text)
+        except Exception as e:
+            logger.error(f"Error formatting job text: {e}")
+            return str(job_text)

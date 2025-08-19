@@ -1,0 +1,84 @@
+{
+    "external_services": {
+        "placeholder_images": {
+            "job_opportunity": "https://img.icons8.com/color/96/000000/job.png",
+            "company": "https://img.icons8.com/color/96/000000/company.png",
+            "job_site": "https://img.icons8.com/color/96/000000/website.png",
+            "geekjob": "https://img.icons8.com/color/96/17a2b8/geekjob.png",
+            "headhunter": "https://img.icons8.com/color/96/ff6b35/headhunter.png"
+        },
+        "via_placeholder": {
+            "job_opportunity": "https://via.placeholder.com/144x144/4CAF50/FFFFFF?text=💼",
+            "company": "https://via.placeholder.com/144x144/2196F3/FFFFFF?text=🏢",
+            "job_site": "https://via.placeholder.com/144x144/FF9800/FFFFFF?text=🔍"
+        },
+        "telegram_api": {
+            "webhook": "https://api.telegram.org/bot{token}/setWebhook"
+        }
+    },
+    "job_sites": {
+        "geekjob": {
+            "name": "GeekJob",
+            "urls": {
+                "api": "https://geekjob.ru/json/find/vacancy",
+                "web": "https://geekjob.ru",
+                "vacancy": "https://geekjob.ru/vacancy/{job_id}",
+                "company": "https://geekjob.ru/company/{company_id}",
+                "company_logo": "https://geekjob.ru/storage/company/{company_id}/logo/{logo_filename}",
+                "company_logo_fallback": "https://geekjob.ru/storage/company/logo/{logo_filename}",
+                "search": "https://geekjob.ru/vacancy?query={query}",
+                "apply": "https://geekjob.ru/vacancy/{job_id}/apply"
+            },
+            "placeholder_image": "https://img.icons8.com/color/96/17a2b8/geekjob.png",
+            "default_params": {
+                "page": 1,
+                "rm": 1,
+                "per_page": 15
+            }
+        },
+        "hh": {
+            "name": "HeadHunter",
+            "urls": {
+                "api": "https://api.hh.ru/vacancies",
+                "api_areas": "https://api.hh.ru/areas",
+                "api_employers": "https://api.hh.ru/employers",
+                "web": "https://hh.ru",
+                "vacancy": "https://hh.ru/vacancy/{job_id}",
+                "employer": "https://hh.ru/employer/{employer_id}",
+                "search": "https://hh.ru/search/vacancy?text={query}",
+                "apply": "https://hh.ru/applicant/vacancy_response?vacancyId={job_id}",
+                "logo_original": "https://img.hhcdn.ru/employer-logo-original/{employer_id}.png",
+                "logo_240": "https://img.hhcdn.ru/employer-logo-240/{employer_id}.png",
+                "logo_90": "https://img.hhcdn.ru/employer-logo-90/{employer_id}.png",
+                "logo_default": "https://img.hhcdn.ru/employer-logo-240/{employer_id}.png",
+                "favicons": "https://i.hh.ru/favicons/{logo_filename}"
+            },
+            "placeholder_image": "https://img.icons8.com/color/96/ff6b35/headhunter.png",
+            "default_params": {
+                "per_page": 8,
+                "order_by": "publication_time"
+            }
+        },
+        "experimental": {
+            "name": "Experimental Jobs",
+            "urls": {
+                "api": "https://experimental.jobs/api",
+                "web": "https://experimental.jobs",
+                "logo_base": "https://experimental.jobs/logos"
+            },
+            "placeholder_image": "https://via.placeholder.com/300x200/6f42c1/ffffff?text=Experimental"
+        }
+    },
+    "url_templates": {
+        "generic": {
+            "vacancy": "https://{site}.ru/vacancy/{job_id}",
+            "company": "https://{site}.ru/company/{company_id}",
+            "search": "https://{site}.ru/search?query={query}",
+            "api": "https://api.{site}.ru"
+        }
+    },
+    "logo_formats": {
+        "geekjob": "https://geekjob.ru/{logo_filename}",
+        "headhunter": "https://i.hh.ru/favicons/{logo_filename}"
+    }
+} 

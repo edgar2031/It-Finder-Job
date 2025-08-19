@@ -1,3 +1,69 @@
-python-telegram-bot==20.6
-python-dotenv
-flask
+# Core dependencies for ItFinderJob project
+# ===========================================
+
+# Telegram Bot API
+python-telegram-bot==20.5
+
+# Environment variables management
+python-dotenv==1.0.0
+
+# Web framework for webhook server
+flask==3.0.0
+
+# HTTP requests for API calls
+requests==2.31.0
+
+# Development and testing dependencies
+# ==================================
+
+# Package management and setup
+setuptools>=65.0.0
+
+# Testing framework (built-in with Python)
+# unittest - included with Python standard library
+
+# Optional development dependencies
+# ===============================
+
+# Code coverage (optional)
+# coverage>=7.0.0
+
+# Code formatting (optional)
+# black>=23.0.0
+
+# Linting (optional)
+# flake8>=6.0.0
+
+# Type checking (optional)
+# mypy>=1.0.0
+
+# Documentation generation (optional)
+# sphinx>=7.0.0
+
+# Performance monitoring (optional)
+# memory-profiler>=0.60.0
+
+# Note: Standard library modules used but not listed:
+# - json
+# - os
+# - sys
+# - time
+# - threading
+# - asyncio
+# - datetime
+# - pathlib
+# - typing
+# - abc
+# - concurrent.futures
+# - argparse
+# - logging
+# - socket
+# - subprocess
+
+# Cache Management
+# ================
+# To disable Python cache (__pycache__ directories):
+# 1. Run: python clean_cache.py
+# 2. Set environment variable: PYTHONDONTWRITEBYTECODE=1
+# 3. Use: python -B your_script.py
+# 4. Or run: disable_cache.bat (Windows) or disable_cache.ps1 (PowerShell)

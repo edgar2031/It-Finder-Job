@@ -1,0 +1,33 @@
+# EditorConfig for Python project
+# https://EditorConfig.org
+
+# top-most EditorConfig file
+root = true
+
+# Default settings for all files
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+# Python files
+[*.py]
+indent_style = space
+indent_size = 4
+max_line_length = 120
+
+# Python-related configuration files
+[*.{cfg,ini,conf}]
+indent_style = space
+indent_size = 4
+
+# Requirements and setup files
+[requirements*.txt]
+indent_style = space
+indent_size = 4
+
+# Log files (preserve formatting)
+[*.log]
+trim_trailing_whitespace = false
+insert_final_newline = false 

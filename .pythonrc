@@ -1,0 +1,8 @@
+# Python configuration for ItFinderJob project
+# Disable bytecode cache
+import sys
+sys.dont_write_bytecode = True
+
+# Disable cache directories
+import os
+os.environ['PYTHONDONTWRITEBYTECODE'] = '1'

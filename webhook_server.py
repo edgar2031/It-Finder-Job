@@ -1,21 +1,33 @@
+"""
+Webhook server for Telegram bot.
+"""
 import asyncio
+import dotenv
 import logging
 import os
+import sys
 import socket
-from concurrent.futures import ThreadPoolExecutor
-from datetime import datetime
-
-from dotenv import load_dotenv
 from flask import Flask, request, jsonify
-from telegram import Update
-from telegram.ext import Application, CommandHandler, InlineQueryHandler, ContextTypes
+from dotenv import load_dotenv
+from datetime import datetime
+from pathlib import Path
+from typing import Dict, Any, Optional
+from concurrent.futures import ThreadPoolExecutor
 
-from controllers.inline_query_controller import inline_query_controller
-from logger import Logger
-from services.search_service import JobSearchService
-from settings import Settings
+from services import JobSearchService, JobResultsLogger
 
-logger = Logger.get_logger(__name__, file_prefix='server')
+# Add project root to path
+project_root = Path(__file__).parent
+sys.path.insert(0, str(project_root))
+
+from telegram import Update, WebhookInfo
+from telegram.ext import Application, ContextTypes, MessageHandler, filters, CommandHandler, InlineQueryHandler
+from telegram.error import TelegramError
+from helpers import LoggerHelper, SettingsHelper
+
+from controllers import TelegramInlineQueryController
+
+logger = LoggerHelper.get_logger(__name__, prefix='server')
 
 # Add these lines to suppress initialization logs
 logging.getLogger('services.hh_location_service').setLevel(logging.WARNING)
@@ -28,38 +40,63 @@ load_dotenv()
 app = Flask(__name__)
 executor = ThreadPoolExecutor(max_workers=4)
 search_service = JobSearchService()
+job_results_logger = JobResultsLogger()
 
 # Initialize Telegram bot
 try:
     telegram_app = Application.builder().token(os.getenv('TELEGRAM_TOKEN')).build()
     telegram_loop = asyncio.new_event_loop()
 except Exception as e:
-    print(f"Failed to initialize Telegram bot: {e}")
+    logger.error(f"Failed to initialize Telegram bot: {e}")
     telegram_app = None
     telegram_loop = None
+
+
+def _get_site_display_name(site_name):
+    """Get display name for site"""
+    site_names = {
+        'hh': 'HeadHunter',
+        'geekjob': 'GeekJob'
+    }
+    return site_names.get(site_name, site_name.title())
 
 
 def search_jobs(keyword):
     """Search jobs using JobSearchService."""
     try:
-        sites = request.args.get('sites', ','.join(Settings.DEFAULT_SITE_CHOICES)).split(',')
-        sites = [site.strip().lower() for site in sites if site.strip().lower() in Settings.AVAILABLE_SITES]
+        sites = request.args.get('sites', ','.join(SettingsHelper.get_default_site_choices())).split(',')
+        sites = [site.strip().lower() for site in sites if site.strip().lower() in SettingsHelper.get_available_sites()]
         if not sites:
             logger.warning("No valid sites specified in request, using default sites")
-            sites = Settings.DEFAULT_SITE_CHOICES
+            sites = SettingsHelper.get_default_site_choices()
 
         results = search_service.search_all_sites(keyword, None, sites)
+        
+        # Log job results for webhook
+        job_results_logger.log_search_results(keyword, results, None, "webhook")
+        
+        # Structure results by sites
+        sites_data = {}
+        for site_name, result in results.items():
+            if site_name == 'global_time' or not isinstance(result, dict):
+                continue
+                
+            jobs = result.get('jobs', [])
+            timing = result.get('timing', 0)
+            
+            sites_data[site_name] = {
+                "name": _get_site_display_name(site_name),
+                "jobs_count": len(jobs),
+                "timing_ms": timing,
+                "jobs": jobs
+            }
+        
         formatted_results = {
             "global_time_ms": results.get('global_time', 0),
-            "results": {
-                site_name: {
-                    "jobs": result.get('jobs', []),
-                    "timing_ms": result.get('timing', 0)
-                } for site_name, result in results.items() if site_name != 'global_time' and isinstance(result, dict)
-            }
+            "sites": sites_data
         }
         logger.info(
-            f"Search request completed for keyword: {keyword}, sites: {sites}, found {sum(len(r['jobs']) for r in formatted_results['results'].values())} jobs")
+            f"Search request completed for keyword: {keyword}, sites: {sites}, found {sum(len(r['jobs']) for r in sites_data.values())} jobs")
         return formatted_results
     except Exception as e:
         logger.error(f"Error in search_jobs for keyword: {keyword}: {e}")
@@ -119,8 +156,8 @@ async def handle_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
             return
 
         response = ["🔍 Search Results:"]
-        for site, data in results.get('results', {}).items():
-            response.append(f"\n🏢 {Settings.get_site_name(site)} ({data['timing_ms']:.0f} ms):")
+        for site, data in results.get('sites', {}).items():
+            response.append(f"\n{data.get('name', SettingsHelper.get_site_name(site))} ({data['timing_ms']:.0f} ms):")
             for idx, job in enumerate(data.get('jobs', [])[:3], 1):
                 response.append(f"{idx}. {job}")
             response.append("")
@@ -128,7 +165,7 @@ async def handle_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
         message = '\n'.join(response) if len(response) > 1 else "No jobs found"
         await update.message.reply_text(message, disable_web_page_preview=True)
         logger.info(
-            f"Displayed {sum(len(r['jobs']) for r in results.get('results', {}).values())} jobs for user {update.effective_user.id}, keyword: {keyword}")
+            f"Displayed {sum(len(r['jobs']) for r in results.get('sites', {}).values())} jobs for user {update.effective_user.id}, keyword: {keyword}")
     except Exception as e:
         logger.error(f"Search command error for user {update.effective_user.id}: {e}")
         await update.message.reply_text(f"🚨 Error: {str(e)}")
@@ -137,7 +174,7 @@ async def handle_search(update: Update, context: ContextTypes.DEFAULT_TYPE):
 # Register handlers
 if telegram_app:
     telegram_app.add_handler(CommandHandler("search", handle_search))
-    telegram_app.add_handler(InlineQueryHandler(inline_query_controller.handle_inline_query))
+    telegram_app.add_handler(InlineQueryHandler(TelegramInlineQueryController.handle_inline_query))
 
 
 def get_server_info():
@@ -158,18 +195,18 @@ def get_server_info():
 
 def print_startup_message(info):
     """Display server startup info"""
-    print("\n" + "=" * 50)
-    print(f"Job Search API Server")
-    print("=" * 50)
-    print(f"Running on: {info['host']}:{info['port']}")
-    print(f"Debug mode: {'ON' if info['debug'] else 'OFF'}")
-    print(f"Hostname: {info['hostname']}")
-    print(f"IP Address: {info['ip_address']}")
-    print(f"Startup Time: {info['start_time']}")
-    print("\nAvailable Endpoints:")
+    logger.info("\n" + "=" * 50)
+    logger.info(f"Job Search API Server")
+    logger.info("=" * 50)
+    logger.info(f"Running on: {info['host']}:{info['port']}")
+    logger.info(f"Debug mode: {'ON' if info['debug'] else 'OFF'}")
+    logger.info(f"Hostname: {info['hostname']}")
+    logger.info(f"IP Address: {info['ip_address']}")
+    logger.info(f"Startup Time: {info['start_time']}")
+    logger.info("\nAvailable Endpoints:")
     for name, endpoint in info['endpoints'].items():
-        print(f"- {name:<10} {endpoint}")
-    print("=" * 50 + "\n")
+        logger.info(f"- {name:<10} {endpoint}")
+    logger.info("=" * 50 + "\n")
 
 
 def run_server():
@@ -186,9 +223,9 @@ def run_server():
                     drop_pending_updates=True
                 )
             )
-            print("Webhook configured successfully")
+            logger.info("Webhook configured successfully")
         except Exception as e:
-            print(f"Webhook configuration failed: {e}")
+            logger.error(f"Webhook configuration failed: {e}")
 
     # Run Flask
     if os.getenv('FLASK_ENV') == 'production':

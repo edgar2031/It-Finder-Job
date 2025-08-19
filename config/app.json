@@ -1,0 +1,28 @@
+{
+    "job_limits": {
+        "main_bot_messages": 10,
+        "inline_query_results": 5,
+        "fallback_results": 5,
+        "max_total_inline": 30,
+        "max_total_fallback": 20,
+        "max_message_length": 1000,
+        "truncate_requirements": 100,
+        "truncate_responsibilities": 100
+    },
+    "performance": {
+        "request_timeout": 10,
+        "max_retries": 3,
+        "cache_expiry_days": 7
+    },
+    "display": {
+        "max_message_length": 1000,
+        "truncate_requirements": 100,
+        "truncate_responsibilities": 100,
+        "company_name_max_length": 50,
+        "location_max_length": 30,
+        "salary_max_length": 35,
+        "job_title_max_length": 41,
+        "work_format_max_length": 20,
+        "experience_max_length": 20
+    }
+} 
