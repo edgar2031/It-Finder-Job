@@ -15,10 +15,15 @@ SALARY_TRUNCATE_SUFFIX = "..."  # Suffix to add when truncating
 
 # Job title display settings
 JOB_TITLE_MAX_LENGTH = 41  # Maximum length for job titles in inline results (exactly 41 characters including ellipsis)
+MAX_TITLE_LENGTH = 50  # Maximum length for job titles in messages and general display
 
 # Additional job information display settings
 WORK_FORMAT_MAX_LENGTH = 20  # Maximum length for work format information
 EXPERIENCE_MAX_LENGTH = 20   # Maximum length for experience level information
+
+# Job description display settings  
+JOB_DESCRIPTION_MAX_LENGTH = 400  # Maximum length for job descriptions in messages
+JOB_REQUIREMENT_MAX_LENGTH = 400  # Maximum length for job requirements (snippet fallback)
 
 # Description formatting
 DESCRIPTION_SEPARATOR = " "  # Separator between description parts

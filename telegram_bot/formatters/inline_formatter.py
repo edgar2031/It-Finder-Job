@@ -19,6 +19,7 @@ from config.app import get_job_limit
 from config.urls import get_placeholder_image
 from helpers.constants import SALARY_ICON, LOCATION_ICON
 from utils.job_formatting import JobFormatting
+from telegram_bot.formatters.message_formatter import MessageFormatter
 
 logger = LoggerHelper.get_logger(__name__, prefix='inline_formatter')
 
@@ -41,7 +42,7 @@ class InlineFormatter:
     """
     
     def __init__(self):
-        pass
+        self.message_formatter = MessageFormatter()
     
     def format_job_results_for_inline(self, query, results_data, language):
         """Format search results for inline query response with optimized performance"""
@@ -395,10 +396,11 @@ class InlineFormatter:
                     logger.info(f"🧹 Sanitized final entry for job {idx} on {site}:")
                     logger.info(f"   {final_job_entry}")
                     
-                    # Create the inline result
+                    # Create the inline result with MessageFormatter support
                     job_result = self._create_inline_result(
                         site, result_id, job_title_display, description_text, 
-                        job_image_url, final_job_entry, keyboard
+                        job_image_url, final_job_entry, keyboard, 
+                        job_data=job, language=language
                     )
                     
                     # Log the created inline result
@@ -524,12 +526,26 @@ class InlineFormatter:
                 logger.info(f"   Description: {description_text}")
                 logger.info(f"   Job link: {job_link}")
                 
+                # Use MessageFormatter for consistent detailed formatting
+                formatted_message = simple_message  # Fallback
+                if isinstance(job, dict) and job:
+                    logger.info(f"📧 Simple results - Using MessageFormatter for detailed formatting")
+                    try:
+                        detailed_message = self.message_formatter.format_telegram_message(job, site, language)
+                        if detailed_message and detailed_message.strip():
+                            formatted_message = detailed_message
+                            logger.info(f"✅ Simple results - MessageFormatter produced detailed message")
+                        else:
+                            logger.warning(f"⚠️ Simple results - MessageFormatter returned empty, using fallback")
+                    except Exception as format_error:
+                        logger.warning(f"❌ Simple results - MessageFormatter failed: {format_error}")
+                
                 job_result = InlineQueryResultArticle(
                     id=f"simple_{site}_{result_id}",
                     title=clean_title[:50],
                     description=description_text,
                     input_message_content=InputTextMessageContent(
-                        message_text=simple_message,
+                        message_text=formatted_message,
                         parse_mode='HTML'
                     ),
                     reply_markup=self._create_job_keyboard(job_link, site, clean_title)
@@ -881,16 +897,34 @@ class InlineFormatter:
         return None
 
     def _create_inline_result(self, site, result_id, job_title_display, description_text, 
-            job_image_url, final_job_entry, keyboard):
-        """Create the final inline query result"""
+            job_image_url, final_job_entry, keyboard, job_data=None, language='en'):
+        """Create the final inline query result with detailed formatting"""
         try:
+            # Use MessageFormatter for detailed formatting if job_data is available
+            formatted_message = final_job_entry  # Fallback to simple format
+            
+            if job_data:
+                logger.info(f"📧 Using MessageFormatter for detailed message formatting")
+                try:
+                    detailed_message = self.message_formatter.format_telegram_message(job_data, site, language)
+                    if detailed_message and detailed_message.strip():
+                        formatted_message = detailed_message
+                        logger.info(f"✅ MessageFormatter produced detailed message (length: {len(formatted_message)})")
+                        logger.info(f"📝 Detailed message preview: {formatted_message[:300]}...")
+                    else:
+                        logger.warning(f"⚠️ MessageFormatter returned empty message, using fallback")
+                except Exception as format_error:
+                    logger.warning(f"❌ MessageFormatter failed: {format_error}, using simple format")
+            else:
+                logger.info(f"ℹ️ No job_data provided, using simple format")
+            
             job_result = InlineQueryResultArticle(
                 id=f"job_{site}_{result_id}",
                 title=job_title_display,
                 description=description_text[:256],
                 thumbnail_url=job_image_url,
                 input_message_content=InputTextMessageContent(
-                    message_text=final_job_entry,
+                    message_text=formatted_message,
                     parse_mode='HTML',
                     disable_web_page_preview=False
                 ),

@@ -23,6 +23,9 @@
         "salary_max_length": 35,
         "job_title_max_length": 41,
         "work_format_max_length": 20,
-        "experience_max_length": 20
+        "experience_max_length": 20,
+        "job_description_max_length": 400,
+        "job_requirement_max_length": 100,
+        "max_title_length": 50
     }
 } 

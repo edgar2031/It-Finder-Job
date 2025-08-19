@@ -15,23 +15,247 @@ from job_sites import BaseJobSite
 logger = LoggerHelper.get_logger(__name__, prefix='hh-service')
 
 """
-Example HeadHunter API Response Structure:
+HeadHunter API Response Structure:
 
-For detailed examples and URL configurations, see config/urls.json.
-The structure includes:
-- items: Array of job vacancies
-- id: Unique job identifier  
-- name: Job title
-- salary: Salary information (from, to, currency, gross)
-- area: Location information (id, name)
-- employer: Company information (id, name, logo_urls, alternate_url)
-- schedule: Work schedule (id, name)
-- experience: Required experience level
-- employment: Employment type
-- description: Job description with HTML tags
-- key_skills: Required skills array
-- published_at: Publication date in ISO format
-- alternate_url: Direct link to the job posting
+SEARCH ENDPOINT (/vacancies):
+{
+    "items": [
+        {
+            "id": "107907244",
+            "name": "Программист Bitrix24, PHP",
+            "salary": {
+                "from": 150000,
+                "to": null,
+                "currency": "RUR",
+                "gross": false
+            },
+            "area": {
+                "id": "1",
+                "name": "Москва"
+            },
+            "employer": {
+                "id": "901158",
+                "name": "Российские коммуникационные системы",
+                "logo_urls": {
+                    "90": "https://...",
+                    "240": "https://..."
+                },
+                "alternate_url": "https://hh.ru/employer/901158"
+            },
+            "schedule": {
+                "id": "fullDay",
+                "name": "Полный день"
+            },
+            "experience": {
+                "id": "between1And3",
+                "name": "От 1 года до 3 лет"
+            },
+            "employment": {
+                "id": "full",
+                "name": "Полная занятость"
+            },
+            "key_skills": [
+                {"name": "PHP"},
+                {"name": "Bitrix24"},
+                {"name": "MySQL"}
+            ],
+            "published_at": "2025-08-19T10:30:00+03:00",
+            "alternate_url": "https://hh.ru/vacancy/107907244",
+            "snippet": {
+                "requirement": "Опыт работы с PHP от 1 года...",
+                "responsibility": "Разработка и поддержка CRM системы..."
+            }
+        }
+    ],
+    "found": 1234,
+    "pages": 25,
+    "page": 0,
+    "per_page": 50
+}
+
+DETAILED VACANCY ENDPOINT (/vacancies/{id}):
+Additional fields available via get_vacancy_by_id():
+{
+    "id": "107907244",
+    "premium": false,
+    "billing_type": {
+        "id": "standard",
+        "name": "Стандарт"
+    },
+    "relations": [],
+    "name": "Программист Bitrix24, PHP",
+    "insider_interview": null,
+    "response_letter_required": false,
+    "area": {
+        "id": "1",
+        "name": "Москва",
+        "url": "https://api.hh.ru/areas/1"
+    },
+    "salary": {
+        "from": 150000,
+        "to": null,
+        "currency": "RUR",
+        "gross": false
+    },
+    "salary_range": {
+        "from": 150000,
+        "to": null,
+        "currency": "RUR",
+        "gross": false,
+        "mode": {
+            "id": "MONTH",
+            "name": "За месяц"
+        },
+        "frequency": null
+    },
+    "type": {
+        "id": "open",
+        "name": "Открытая"
+    },
+    "address": {
+        "city": "Москва",
+        "street": "Авиамоторная улица",
+        "building": "53к2",
+        "lat": 55.746203,
+        "lng": 37.722765,
+        "description": null,
+        "raw": "Москва, Авиамоторная улица, 53к2",
+        "metro": {
+            "station_name": "Авиамоторная",
+            "line_name": "Калининская",
+            "station_id": "8.1",
+            "line_id": "8",
+            "lat": 55.751933,
+            "lng": 37.717444
+        },
+        "metro_stations": [
+            {
+                "station_name": "Авиамоторная",
+                "line_name": "Калининская",
+                "station_id": "8.1",
+                "line_id": "8",
+                "lat": 55.751933,
+                "lng": 37.717444
+            }
+        ]
+    },
+    "allow_messages": true,
+    "experience": {
+        "id": "between1And3",
+        "name": "От 1 года до 3 лет"
+    },
+    "schedule": {
+        "id": "fullDay",
+        "name": "Полный день"
+    },
+    "employment": {
+        "id": "full",
+        "name": "Полная занятость"
+    },
+    "department": null,
+    "show_contacts": false,
+    "contacts": null,
+    "description": "<p><strong><em>АО «Российские космические системы</em></strong><em>» (РКС, входит в Госкорпорацию \"Роскосмос\") - один из лидеров мирового космического приборостроения, разрабатывает, производит, испытывает, поставляет и эксплуатирует бортовую и наземную аппаратуру и информационные системы космического назначения на протяжении 75 лет.</em></p> <p><strong>Обязанности:</strong></p> <ul> <li>Разработка и поддержка проектов на базе 1С-Bitrix;</li> <li>Интеграция сайтов со сторонними сервисами и внутренними системами компании;</li> <li>Мониторинг ошибок, тестирование, исправление;</li> <li>Отладка и тестирование готовых решений и модулей.</li> </ul> <p><strong>Требования:</strong></p> <ul> <li>Умение работать с чужим кодом;</li> <li>Опыт работы с сайтами на платформе 1c-Bitrix;</li> <li>Опыт интеграции 1C-Bitrix с 1C;</li> <li>Опыт написания компонентов и модулей для 1C-Bitrix;</li> <li>Уверенное знание PHP, Javascript, AJAX, JQuery, HTML, CSS, MySQL;</li> <li>Знание архитектуры 1C-Bitrix и его базы данных.</li> </ul> <p><strong>Условия:</strong></p> <ul> <li>Работа на крупном предприятии ракетно-космической отрасли, занимающая лидирующие позиции на рынке уже около 75 лет;</li> <li>официальное оформление согласно ТК РФ, оплачиваемые отпуск и больничные листы;</li> <li>хороший и дружный коллектив, программы наставничества;</li> <li>возможность получения дополнительного высшего образования на базе предприятия (магистратура, аспирантура);</li> <li>социальные поддерживающие программы для работников;</li> <li>медико-санитарная часть на территории предприятия и ДМС.</li> </ul>",
+    "branded_description": null,
+    "vacancy_constructor_template": {
+        "id": 47656,
+        "name": "Брендированный шаблон 1",
+        "top_picture": {
+            "height": 560,
+            "width": 1540,
+            "path": "https://img.hhcdn.ru/branding-pictures/3327262.jpeg",
+            "blurred_path": null
+        },
+        "bottom_picture": {
+            "height": 704,
+            "width": 1540,
+            "path": "https://img.hhcdn.ru/branding-pictures/3327269.png",
+            "blurred_path": null
+        }
+    },
+    "key_skills": [
+        {"name": "1С-Битрикс"},
+        {"name": "Bitrix"},
+        {"name": "PHP"},
+        {"name": "Web-дизайн"},
+        {"name": "MySQL"},
+        {"name": "Java"},
+        {"name": "API"},
+        {"name": "JSON API"},
+        {"name": "SQL"},
+        {"name": "Веб-программирование"}
+    ],
+    "accept_handicapped": false,
+    "accept_kids": false,
+    "age_restriction": null,
+    "archived": false,
+    "response_url": null,
+    "specializations": [],
+    "professional_roles": [
+        {
+            "id": "96",
+            "name": "Программист, разработчик"
+        }
+    ],
+    "code": "5503",
+    "hidden": false,
+    "quick_responses_allowed": false,
+    "driver_license_types": [],
+    "accept_incomplete_resumes": false,
+    "employer": {
+        "id": "901158",
+        "name": "Российские космические системы",
+        "url": "https://api.hh.ru/employers/901158",
+        "alternate_url": "https://hh.ru/employer/901158",
+        "logo_urls": {
+            "original": "https://img.hhcdn.ru/employer-logo-original/1255182.jpg",
+            "90": "https://img.hhcdn.ru/employer-logo/6641157.jpeg",
+            "240": "https://img.hhcdn.ru/employer-logo/6641158.jpeg"
+        },
+        "vacancies_url": "https://api.hh.ru/vacancies?employer_id=901158",
+        "accredited_it_employer": false,
+        "trusted": true
+    },
+    "published_at": "2025-08-19T17:22:07+0300",
+    "created_at": "2025-08-19T17:22:07+0300",
+    "initial_created_at": "2024-09-30T09:03:55+0300",
+    "negotiations_url": null,
+    "suitable_resumes_url": null,
+    "apply_alternate_url": "https://hh.ru/applicant/vacancy_response?vacancyId=107907244",
+    "has_test": true,
+    "test": {
+        "required": true
+    },
+    "alternate_url": "https://hh.ru/vacancy/107907244",
+    "working_days": [],
+    "working_time_intervals": [],
+    "working_time_modes": [],
+    "accept_temporary": false,
+    "languages": [],
+    "approved": true,
+    "employment_form": {
+        "id": "FULL",
+        "name": "Полная"
+    },
+    "fly_in_fly_out_duration": [],
+    "internship": false,
+    "night_shifts": false,
+    "work_format": [],
+    "work_schedule_by_days": [
+        {
+            "id": "FIVE_ON_TWO_OFF",
+            "name": "5/2"
+        }
+    ],
+    "working_hours": [
+        {
+            "id": "HOURS_8",
+            "name": "8 часов"
+        }
+    ],
+    "show_logo_in_search": true,
+    "closed_for_applicants": false
+}
 
 All URLs are now configured in config/urls.json for maintainability.
 """
@@ -633,6 +857,9 @@ class HHSite(BaseJobSite):
         """
         Get detailed vacancy information by ID using HeadHunter API.
         
+        Uses the configured 'api_vacancy_details' URL from config/urls.json
+        URL: https://api.hh.ru/vacancies/{vacancy_id}
+        
         Args:
             vacancy_id: The vacancy ID to fetch
             
@@ -644,14 +871,16 @@ class HHSite(BaseJobSite):
             return None
             
         try:
-            # Construct the API URL for individual vacancy
-            vacancy_url = f"{self.base_url}/{vacancy_id}"
+            # Get the API URL for individual vacancy from configuration
+            from config.sites import get_site_url
+            vacancy_url = get_site_url('hh', 'api_vacancy_details', vacancy_id=vacancy_id)
             
             logger.info(
-                "Fetching vacancy details",
+                "Fetching vacancy details using configured URL",
                 extra={
                     'vacancy_id': vacancy_id,
-                    'api_url': vacancy_url
+                    'api_url': vacancy_url,
+                    'url_source': 'config/urls.json api_vacancy_details'
                 }
             )
             

@@ -24,41 +24,97 @@ class MessageFormatter:
     
     Example output:
     ```
-    <a href="https://hh.ru/vacancy/123456">Эксперт по web-разработке [Remote]</a>
-    <a href="https://hh.ru/employer/123456">@Гринатом</a>
+    HH COMPREHENSIVE FORMAT (with get_vacancy_by_id data using api_vacancy_details):
+    <a href="https://hh.ru/vacancy/107907244">Программист Bitrix24, PHP [Remote]</a> <a href="https://hh.ru/employer/901158">@Российские к...</a>
     
-    200 000 —‍ 240 000 ₽/мес на руки
+    от 150,000 ₽/мес на руки
     
     📍Москва
+    👨‍💼 От 1 года до 3 лет
+    💼 Полная занятость
+    🔧 PHP, Bitrix24, MySQL
+    📅 2025-08-19
+    👔 Программист, разработчик
+    ⏰ Пн-Пт, 09:00-18:00
+    📋 <strong>ПРОДУКТ</strong>
     
+    Мы ищем Frontend-разработчика для Open Source продукта...
+    
+    <strong>ТРЕБОВАНИЯ</strong>
+    • Уверенный опыт разработки на последних версиях React и TypeScript
+    • Глубокое знание современного JavaScript/TypeScript...
+    
+    [Full description with HTML formatting, no truncation]
     👩‍💻 Можно работать удалённо из РФ
+    
+    GEEKJOB FORMAT:
+    <a href="https://geekjob.ru/vacancy/689c9a736bbca929b703cb03">Middle Full Stack разра... [Remote]</a> <a href="https://geekjob.ru/company/66ace606e5df2c87560b2ac8">@Crypto.news</a>
+    
+    Зарплата не указана
+    
+    📍Удалённая работа (Дубай, ОАЭ)
+    💼 Полная занятость
+    📅 13 августа
+    👩‍💻 Можно работать удалённо
     ```
     
     Message structure:
-    1. JOB TITLE (clickable link to vacancy)
-       - Format: <a href="job_url">Job Title [Work Format]</a>
+    1. JOB TITLE AND COMPANY NAME (same row)
+       - Job Format: <a href="job_url">Job Title [Work Format]</a>
+       - Company Format: <a href="company_url">@Company Name</a>
        - Preserves original job links from job sites
-       - Clean title without extra metadata
+       - Clean title without extra metadata, company with @ prefix
     
-    2. COMPANY NAME (clickable link to company page)
-       - Format: <a href="company_url">@Company Name</a>
-       - Uses @ prefix for company identification
-       - Links to company profile when available
-    
-    3. SALARY (clean display without icon)
+    2. SALARY (clean display without icon)
        - Shows only salary information
        - Removes requirements/descriptions
        - Preserves currency and format (₽, $, €)
     
-    4. LOCATION (with emoji)
+    3. LOCATION (with emoji)
        - Format: 📍Location Name
        - Clean location without extra metadata
        - Uses structured data when available
     
-    5. WORK FORMAT (if remote)
-       - Format: 👩‍💻 Work format description
-       - Only shows for remote positions
-       - Provides helpful context about remote work
+    4. EXPERIENCE LEVEL (with emoji)
+       - Format: 👨‍💼 Experience description
+       - Shows required experience level
+       - Based on job site data
+    
+    5. EMPLOYMENT TYPE (with emoji)
+       - Format: 💼 Employment type
+       - Full-time, part-time, contract, etc.
+       - Based on job site data
+    
+    6. KEY SKILLS (with emoji, limited to 3)
+       - Format: 🔧 Skill1, Skill2, Skill3
+       - Most important skills from job posting
+       - Truncated to avoid message overflow
+    
+    7. PUBLICATION DATE (with emoji)
+       - Format: 📅 YYYY-MM-DD
+       - When the job was posted
+       - Helps assess job freshness
+    
+    8. PROFESSIONAL ROLE (HH detailed info)
+       - Format: 👔 Role name
+       - Professional category/role (e.g., "Программист, разработчик")
+       - Available from HH's get_vacancy_by_id endpoint
+    
+    9. WORKING SCHEDULE (HH detailed info)
+       - Format: ⏰ Schedule description
+       - Working days and hours (e.g., "Пн-Пт, 09:00-18:00")
+       - Available from HH's get_vacancy_by_id endpoint
+    
+    10. JOB DESCRIPTION (HH/GeekJob detailed info)
+        - Format: 📋 Full job description  
+        - Complete job description with HTML formatting preserved
+        - No length limits - shows full content from HH's description field
+        - Uses Telegram-supported HTML tags (<strong>, <b>, <em>, <i>, bullet points)
+    
+    11. WORK FORMAT (if remote)
+        - Format: 👩‍💻 Work format description
+        - Only shows for remote positions
+        - Provides helpful context about remote work
     
     Key features:
     - Formats detailed job messages using VacancyTelegramFormatter
@@ -70,6 +126,7 @@ class MessageFormatter:
     """
     
     def __init__(self):
+        self.config_helper = ConfigHelper()
         logger.info(f"🚀 MessageFormatter initialized")
         logger.info(f"📋 Available methods: {[method for method in dir(self) if not method.startswith('_')]}")
     
@@ -134,40 +191,122 @@ class MessageFormatter:
         location_info = self._extract_clean_location_info(raw_text, source_data, site)
         work_format_info = self._extract_clean_work_format(source_data, site)
         
+        # Extract additional job information
+        experience_info = self._extract_experience_level(source_data, site)
+        employment_info = self._extract_employment_type(source_data, site)
+        skills_info = self._extract_key_skills(source_data, site, max_skills=3)
+        publication_date = self._extract_publication_date(source_data, site)
+        
+        # Extract detailed HH information (available via get_vacancy_by_id)
+        professional_role = self._extract_professional_role(source_data, site)
+        working_schedule = self._extract_working_schedule(source_data, site)
+        job_description = self._extract_job_description(source_data, site)
+        
         # Build clean message parts
         message_parts = []
         
-        # 1. Job title with clickable link
+        # 1. Job title and company on the same row
+        first_row_parts = []
         if job_title:
-            message_parts.append(job_title)
-        
-        # 2. Company with clickable link
+            first_row_parts.append(job_title)
         if company_info:
-            message_parts.append(company_info)
+            first_row_parts.append(company_info)
         
-        # 3. Empty line for separation
+        if first_row_parts:
+            # Combine job title and company with space
+            combined_first_row = " ".join(first_row_parts)
+            message_parts.append(combined_first_row)
+        
+        # 2. Empty line for separation
         message_parts.append("")
         
-        # 4. Salary (clean, no metadata)
+        # 3. Salary (clean, no metadata)
         if salary_info:
             message_parts.append(salary_info)
         
-        # 5. Empty line for separation
+        # 4. Empty line for separation
         message_parts.append("")
         
-        # 6. Location with emoji
+        # 5. Location with emoji
         if location_info:
             message_parts.append(f"📍{location_info}")
         
-        # 7. Work format if remote
+        # 6. Experience level
+        if experience_info:
+            message_parts.append(f"👨‍💼 {experience_info}")
+        
+        # 7. Employment type
+        if employment_info:
+            message_parts.append(f"💼 {employment_info}")
+        
+        # 8. Key skills (limited to 3)
+        if skills_info:
+            message_parts.append(f"🔧 {skills_info}")
+        
+        # 9. Publication date
+        if publication_date:
+            message_parts.append(f"📅 {publication_date}")
+        
+        # 10. Professional role (HH detailed info)
+        if professional_role:
+            message_parts.append(f"👔 {professional_role}")
+        
+        # 11. Working schedule (HH detailed info)
+        if working_schedule:
+            message_parts.append(f"⏰ {working_schedule}")
+        
+        # 12. Job description (HH detailed info)
+        if job_description:
+            message_parts.append(f"📋 {job_description}")
+        
+        # 13. Work format if remote (check multiple sources)
+        show_remote_format = False
+        remote_text = ""
+        
+        # Check work_format_info
         if work_format_info and 'remote' in work_format_info.lower():
-            message_parts.append(f"👩‍💻 {work_format_info}")
+            show_remote_format = True
+            remote_text = work_format_info
+        
+        # Also check if job title has [Remote] tag
+        elif job_title and '[remote]' in job_title.lower():
+            show_remote_format = True
+            remote_text = "Можно работать удалённо из РФ"
+        
+        # Check schedule data directly
+        elif isinstance(source_data, dict) and source_data.get('schedule'):
+            schedule = source_data['schedule']
+            if isinstance(schedule, dict):
+                schedule_name = schedule.get('name', '').lower()
+                if 'удаленная' in schedule_name or 'remote' in schedule_name:
+                    show_remote_format = True
+                    remote_text = "Можно работать удалённо из РФ"
+        
+        if show_remote_format:
+            message_parts.append(f"👩‍💻 {remote_text}")
         
         # Join all parts
         final_message = "\n".join(message_parts)
         
-        logger.info(f"✅ Clean message created with {len(message_parts)} parts")
-        return final_message
+        # Final validation to ensure no malformed HTML
+        if self._validate_html_tags(final_message):
+            logger.info(f"✅ Clean message created with {len(message_parts)} parts - HTML validation passed")
+            return final_message
+        else:
+            logger.warning(f"⚠️ HTML validation failed for final message, creating safe fallback")
+            # Create a safe fallback without any HTML links
+            safe_parts = []
+            if message_parts:
+                # Remove HTML from first part (job title)
+                safe_title = JobFormatting.clean_all_html_tags(message_parts[0]) if message_parts[0] else "Job Opening"
+                safe_parts.append(safe_title)
+                
+                # Add remaining parts (they shouldn't have HTML)
+                safe_parts.extend(message_parts[1:])
+            
+            safe_message = "\n".join(safe_parts)
+            logger.info(f"✅ Safe fallback message created")
+            return safe_message
     
     def _extract_clean_job_title(self, raw_text, source_data, site):
         """Extract clean job title with clickable link"""
@@ -176,16 +315,45 @@ class MessageFormatter:
         logger.info(f"📋 Source data type: {type(source_data).__name__}")
         
         # Extract title from raw text or source data
-        if isinstance(source_data, dict) and source_data.get('name'):
-            title = source_data['name']
-            job_url = source_data.get('alternate_url', '')
-            logger.info(f"✅ Title extracted from source data: {title}")
-            logger.info(f"🔗 Job URL from source data: {job_url}")
-        else:
+        title = None
+        job_url = ''
+        
+        if isinstance(source_data, dict):
+            # HH format uses 'name' field
+            if site == 'hh' and source_data.get('name'):
+                title = source_data['name']
+                job_url = source_data.get('alternate_url', '')
+                logger.info(f"✅ HH title extracted from source data: {title}")
+                logger.info(f"🔗 HH job URL from source data: {job_url}")
+            
+            # GeekJob format uses 'position' field
+            elif site == 'geekjob' and source_data.get('position'):
+                title = source_data['position']
+                job_id = source_data.get('id', '')
+                if job_id:
+                    job_url = f"https://geekjob.ru/vacancy/{job_id}"
+                logger.info(f"✅ GeekJob title extracted from source data: {title}")
+                logger.info(f"🔗 GeekJob job URL constructed: {job_url}")
+            
+            # Fallback - try both fields
+            elif source_data.get('name'):
+                title = source_data['name']
+                job_url = source_data.get('alternate_url', '')
+                logger.info(f"✅ Title extracted from 'name' field: {title}")
+                logger.info(f"🔗 Job URL from source data: {job_url}")
+            elif source_data.get('position'):
+                title = source_data['position']
+                logger.info(f"✅ Title extracted from 'position' field: {title}")
+        
+        if not title:
             # Extract from raw text
             logger.info(f"🔄 Extracting title from raw text")
-            title = JobFormatting.extract_job_title(raw_text)
-            logger.info(f"📝 Title extracted from raw text: {title}")
+            raw_title = JobFormatting.extract_job_title(raw_text)
+            logger.info(f"📝 Raw title extracted from text: {raw_title}")
+            
+            # Clean any existing HTML tags from the title to prevent malformed HTML
+            title = JobFormatting.clean_all_html_tags(raw_title) if raw_title else ''
+            logger.info(f"🧹 Cleaned title (HTML removed): {title}")
             
             # Try to extract URL from raw text
             import re
@@ -201,21 +369,52 @@ class MessageFormatter:
         logger.info(f"🔍 Checking for work format to add to title")
         work_format = self._extract_work_format_for_title(source_data, site)
         if work_format:
-            title_with_format = f"{title} [{work_format}]"
-            logger.info(f"✅ Title with work format: {title_with_format}")
+            # Reserve space for work format when truncating
+            work_format_tag = f"[{work_format}]"
+            reserved_space = len(work_format_tag) + 1  # +1 for space before tag
+            max_title_length = self.config_helper.get_max_title_length() - reserved_space
+            
+            # Truncate title first, then add work format
+            truncated_title = self._truncate_text_with_ellipsis(title, max_title_length)
+            title_with_format = f"{truncated_title} {work_format_tag}"
+            logger.info(f"✅ Title with work format (reserved {reserved_space} chars): {title_with_format}")
         else:
-            title_with_format = title
+            # No work format, use full configured max length for title
+            title_with_format = self._truncate_text_with_ellipsis(title, self.config_helper.get_max_title_length())
             logger.info(f"ℹ️ Title without work format: {title_with_format}")
         
         # Create clickable link
         if job_url:
-            final_title = f'<a href="{job_url}">{title_with_format}</a>'
+            # Ensure title_with_format doesn't contain any HTML tags to prevent nesting
+            clean_title = JobFormatting.clean_all_html_tags(title_with_format)
+            final_title = f'<a href="{job_url}">{clean_title}</a>'
             logger.info(f"🔗 Created clickable title with URL: {final_title[:100]}...")
+            
+            # Validate the HTML is well-formed
+            if self._validate_html_tags(final_title):
+                logger.info(f"✅ HTML validation passed for job title")
+            else:
+                logger.warning(f"⚠️ HTML validation failed, using clean title without link")
+                final_title = clean_title
         else:
             final_title = title_with_format
             logger.info(f"ℹ️ Created title without URL: {final_title}")
         
         return final_title
+    
+    def _truncate_text_with_ellipsis(self, text, max_length):
+        """Truncate text to max_length and add ellipsis if needed"""
+        if not text:
+            return text
+        
+        text = str(text).strip()
+        if len(text) <= max_length:
+            return text
+        
+        # Truncate and add ellipsis
+        truncated = text[:max_length-3].strip() + "..."
+        logger.info(f"✂️ Text truncated from {len(text)} to {len(truncated)} chars: '{text[:20]}...' -> '{truncated}'")
+        return truncated
     
     def _extract_clean_company_info(self, raw_text, source_data, site):
         """Extract clean company info with clickable link"""
@@ -223,36 +422,88 @@ class MessageFormatter:
         logger.info(f"📋 Source data type: {type(source_data).__name__}")
         
         # Extract company from source data
-        if isinstance(source_data, dict) and source_data.get('employer'):
-            logger.info(f"✅ Found employer data in source_data")
-            employer = source_data['employer']
-            if isinstance(employer, dict):
-                company_name = employer.get('name', '')
-                company_url = employer.get('alternate_url', '')
-                logger.info(f"🏢 Company name from employer dict: {company_name}")
-                logger.info(f"🔗 Company URL from employer dict: {company_url}")
-            else:
-                company_name = str(employer)
-                company_url = ''
-                logger.info(f"🏢 Company name from employer string: {company_name}")
-                logger.info(f"ℹ️ No company URL (employer is not dict)")
-        else:
+        company_name = ''
+        company_url = ''
+        
+        if isinstance(source_data, dict):
+            # HH format uses 'employer' field
+            if site == 'hh' and source_data.get('employer'):
+                logger.info(f"✅ Found HH employer data in source_data")
+                employer = source_data['employer']
+                if isinstance(employer, dict):
+                    company_name = employer.get('name', '')
+                    company_url = employer.get('alternate_url', '')
+                    logger.info(f"🏢 HH company name from employer dict: {company_name}")
+                    logger.info(f"🔗 HH company URL from employer dict: {company_url}")
+                else:
+                    company_name = str(employer)
+                    logger.info(f"🏢 HH company name from employer string: {company_name}")
+            
+            # GeekJob format uses 'company' field
+            elif site == 'geekjob' and source_data.get('company'):
+                logger.info(f"✅ Found GeekJob company data in source_data")
+                company = source_data['company']
+                if isinstance(company, dict):
+                    company_name = company.get('name', '')
+                    company_id = company.get('id', '')
+                    if company_id:
+                        company_url = f"https://geekjob.ru/company/{company_id}"
+                    logger.info(f"🏢 GeekJob company name from company dict: {company_name}")
+                    logger.info(f"🔗 GeekJob company URL constructed: {company_url}")
+                else:
+                    company_name = str(company)
+                    logger.info(f"🏢 GeekJob company name from company string: {company_name}")
+            
+            # Fallback - try both field names
+            elif source_data.get('employer'):
+                employer = source_data['employer']
+                if isinstance(employer, dict):
+                    company_name = employer.get('name', '')
+                    company_url = employer.get('alternate_url', '')
+                else:
+                    company_name = str(employer)
+                logger.info(f"🏢 Fallback company name from employer: {company_name}")
+            elif source_data.get('company'):
+                company = source_data['company']
+                if isinstance(company, dict):
+                    company_name = company.get('name', '')
+                else:
+                    company_name = str(company)
+                logger.info(f"🏢 Fallback company name from company: {company_name}")
+        
+        if not company_name:
             # Extract from raw text
             logger.info(f"🔄 Extracting company info from raw text")
-            company_name = JobFormatting.extract_company_info(raw_text)
+            raw_company_name = JobFormatting.extract_company_info(raw_text)
+            # Clean any existing HTML tags from company name to prevent malformed HTML
+            company_name = JobFormatting.clean_all_html_tags(raw_company_name) if raw_company_name else ''
             company_url = ''
-            logger.info(f"🏢 Company name extracted from raw text: {company_name}")
+            logger.info(f"🏢 Raw company name extracted: {raw_company_name}")
+            logger.info(f"🧹 Cleaned company name (HTML removed): {company_name}")
         
         if not company_name:
             logger.warning(f"❌ No company name found")
             return None
         
+        # Apply maximum length limit (15 characters)
+        company_name = self._truncate_text_with_ellipsis(company_name, 15)
+        
         # Create clickable link with @ prefix
         if company_url:
-            final_company = f'<a href="{company_url}">@{company_name}</a>'
+            # Ensure company_name doesn't contain any HTML tags to prevent nesting
+            clean_company = JobFormatting.clean_all_html_tags(company_name)
+            final_company = f'<a href="{company_url}">@{clean_company}</a>'
             logger.info(f"🔗 Created clickable company with URL: {final_company}")
+            
+            # Validate the HTML is well-formed
+            if self._validate_html_tags(final_company):
+                logger.info(f"✅ HTML validation passed for company")
+            else:
+                logger.warning(f"⚠️ HTML validation failed, using clean company without link")
+                final_company = f"@{clean_company}"
         else:
-            final_company = f"@{company_name}"
+            clean_company = JobFormatting.clean_all_html_tags(company_name)
+            final_company = f"@{clean_company}"
             logger.info(f"ℹ️ Created company without URL: {final_company}")
         
         return final_company
@@ -319,13 +570,18 @@ class MessageFormatter:
         salary_raw = JobFormatting.extract_salary_info(raw_text)
         logger.info(f"💰 Raw salary from text: {salary_raw}")
         
-        if salary_raw:
+        if salary_raw and self._is_valid_salary_text(salary_raw):
             # Clean salary from extra metadata
             cleaned_salary = self._clean_salary_display(salary_raw)
             logger.info(f"💰 Cleaned salary: {cleaned_salary}")
             return cleaned_salary
+        else:
+            if salary_raw:
+                logger.warning(f"❌ Extracted text doesn't look like valid salary info: {salary_raw[:100]}...")
+            else:
+                logger.warning(f"❌ No salary information found in text")
         
-        logger.warning(f"❌ No salary information found")
+        logger.warning(f"❌ No valid salary information found")
         return None
     
     def _extract_clean_location_info(self, raw_text, source_data, site):
@@ -371,25 +627,40 @@ class MessageFormatter:
         logger.info(f"👩‍💻 Extracting clean work format for site: {site}")
         logger.info(f"📋 Source data type: {type(source_data).__name__}")
         
-        if isinstance(source_data, dict) and source_data.get('schedule'):
-            logger.info(f"✅ Found schedule data in source_data")
-            schedule = source_data['schedule']
-            logger.info(f"⏰ Raw schedule data: {schedule}")
-            
-            if isinstance(schedule, dict):
-                schedule_name = schedule.get('name', '')
-                logger.info(f"⏰ Schedule name: {schedule_name}")
+        if isinstance(source_data, dict):
+            # HH format - check schedule field
+            if site == 'hh' and source_data.get('schedule'):
+                logger.info(f"✅ Found HH schedule data in source_data")
+                schedule = source_data['schedule']
+                logger.info(f"⏰ Raw HH schedule data: {schedule}")
                 
-                if 'удален' in schedule_name.lower() or 'remote' in schedule_name.lower():
-                    work_format = 'Можно работать удалённо из РФ'
-                    logger.info(f"✅ Remote work detected: {work_format}")
+                if isinstance(schedule, dict):
+                    schedule_name = schedule.get('name', '')
+                    logger.info(f"⏰ HH schedule name: {schedule_name}")
+                    
+                    if 'удален' in schedule_name.lower() or 'remote' in schedule_name.lower():
+                        work_format = 'Можно работать удалённо из РФ'
+                        logger.info(f"✅ HH remote work detected: {work_format}")
+                        return work_format
+                    else:
+                        logger.info(f"ℹ️ HH not remote work: {schedule_name}")
+                else:
+                    logger.info(f"⏰ HH schedule data is not a dict: {type(schedule).__name__}")
+            
+            # GeekJob format - check jobFormat field
+            elif site == 'geekjob' and source_data.get('jobFormat'):
+                logger.info(f"✅ Found GeekJob jobFormat data in source_data")
+                job_format = source_data['jobFormat']
+                logger.info(f"🎯 Raw GeekJob jobFormat data: {job_format}")
+                
+                if isinstance(job_format, dict) and job_format.get('remote'):
+                    work_format = 'Можно работать удалённо'
+                    logger.info(f"✅ GeekJob remote work detected: {work_format}")
                     return work_format
                 else:
-                    logger.info(f"ℹ️ Not remote work: {schedule_name}")
+                    logger.info(f"ℹ️ GeekJob not remote work")
             else:
-                logger.info(f"⏰ Schedule data is not a dict: {type(schedule).__name__}")
-        else:
-            logger.info(f"ℹ️ No schedule data in source_data")
+                logger.info(f"ℹ️ No schedule/jobFormat data in source_data for {site}")
         
         logger.info(f"ℹ️ No remote work format found")
         return None
@@ -399,25 +670,40 @@ class MessageFormatter:
         logger.info(f"🏷️ Extracting work format for title for site: {site}")
         logger.info(f"📋 Source data type: {type(source_data).__name__}")
         
-        if isinstance(source_data, dict) and source_data.get('schedule'):
-            logger.info(f"✅ Found schedule data in source_data")
-            schedule = source_data['schedule']
-            logger.info(f"⏰ Raw schedule data: {schedule}")
-            
-            if isinstance(schedule, dict):
-                schedule_name = schedule.get('name', '')
-                logger.info(f"⏰ Schedule name: {schedule_name}")
+        if isinstance(source_data, dict):
+            # HH format - check schedule field
+            if site == 'hh' and source_data.get('schedule'):
+                logger.info(f"✅ Found HH schedule data in source_data")
+                schedule = source_data['schedule']
+                logger.info(f"⏰ Raw HH schedule data: {schedule}")
                 
-                if 'удален' in schedule_name.lower() or 'remote' in schedule_name.lower():
+                if isinstance(schedule, dict):
+                    schedule_name = schedule.get('name', '')
+                    logger.info(f"⏰ HH schedule name: {schedule_name}")
+                    
+                    if 'удален' in schedule_name.lower() or 'remote' in schedule_name.lower():
+                        work_format = 'Remote'
+                        logger.info(f"✅ HH remote work detected for title: {work_format}")
+                        return work_format
+                    else:
+                        logger.info(f"ℹ️ HH not remote work for title: {schedule_name}")
+                else:
+                    logger.info(f"⏰ HH schedule data is not a dict: {type(schedule).__name__}")
+            
+            # GeekJob format - check jobFormat field
+            elif site == 'geekjob' and source_data.get('jobFormat'):
+                logger.info(f"✅ Found GeekJob jobFormat data in source_data")
+                job_format = source_data['jobFormat']
+                logger.info(f"🎯 Raw GeekJob jobFormat data: {job_format}")
+                
+                if isinstance(job_format, dict) and job_format.get('remote'):
                     work_format = 'Remote'
-                    logger.info(f"✅ Remote work detected for title: {work_format}")
+                    logger.info(f"✅ GeekJob remote work detected for title: {work_format}")
                     return work_format
                 else:
-                    logger.info(f"ℹ️ Not remote work for title: {schedule_name}")
+                    logger.info(f"ℹ️ GeekJob not remote work for title")
             else:
-                logger.info(f"⏰ Schedule data is not a dict: {type(schedule).__name__}")
-        else:
-            logger.info(f"ℹ️ No schedule data in source_data")
+                logger.info(f"ℹ️ No schedule/jobFormat data in source_data for {site}")
         
         logger.info(f"ℹ️ No work format for title found")
         return None
@@ -682,3 +968,346 @@ class MessageFormatter:
         
         logger.info(f"❌ No job link could be extracted")
         return None
+    
+    def _validate_html_tags(self, html_text):
+        """Validate that HTML tags are properly formed and not nested incorrectly"""
+        import re
+        
+        if not html_text:
+            return True
+        
+        # Check for basic HTML tag structure issues
+        # Look for malformed href attributes (duplicate href within single <a> tag)
+        # Multiple <a> tags with separate href attributes are valid
+        single_tag_pattern = r'<a[^>]*>'
+        a_tags = re.findall(single_tag_pattern, html_text)
+        for a_tag in a_tags:
+            if a_tag.count('href="') > 1:
+                logger.warning(f"⚠️ Multiple href attributes in single <a> tag: {a_tag}")
+                return False
+        
+        # Check for unclosed tags
+        open_tags = re.findall(r'<(\w+)[^>]*>', html_text)
+        close_tags = re.findall(r'</(\w+)>', html_text)
+        
+        if len(open_tags) != len(close_tags):
+            logger.warning(f"⚠️ Mismatched HTML tags - Open: {open_tags}, Close: {close_tags}")
+            return False
+        
+        # Check for actually nested identical tags (like <a><a>content</a></a>)
+        # This regex checks for an opening <a> tag that contains another opening <a> tag before its closing tag
+        if re.search(r'<a[^>]*>[^<]*<a[^>]*>', html_text):
+            logger.warning(f"⚠️ Nested <a> tags detected in: {html_text[:100]}...")
+            return False
+        
+        return True
+    
+    def _extract_experience_level(self, source_data, site):
+        """Extract experience level information"""
+        logger.info(f"👨‍💼 Extracting experience level for site: {site}")
+        logger.info(f"📋 Source data type: {type(source_data).__name__}")
+        
+        if isinstance(source_data, dict):
+            # HH format
+            if site == 'hh' and source_data.get('experience'):
+                logger.info(f"✅ Found HH experience data in source_data")
+                experience_data = source_data['experience']
+                if isinstance(experience_data, dict):
+                    experience_name = experience_data.get('name', '')
+                    logger.info(f"👨‍💼 HH experience level from dict: {experience_name}")
+                    return experience_name
+                else:
+                    experience_name = str(experience_data)
+                    logger.info(f"👨‍💼 HH experience level from string: {experience_name}")
+                    return experience_name
+            
+            # GeekJob format - doesn't typically have experience level
+            elif site == 'geekjob':
+                logger.info(f"ℹ️ GeekJob typically doesn't provide experience level data")
+                return None
+        
+        logger.info(f"❌ No experience level found")
+        return None
+    
+    def _extract_employment_type(self, source_data, site):
+        """Extract employment type information"""
+        logger.info(f"💼 Extracting employment type for site: {site}")
+        logger.info(f"📋 Source data type: {type(source_data).__name__}")
+        
+        if isinstance(source_data, dict):
+            # HH format
+            if site == 'hh' and source_data.get('employment'):
+                logger.info(f"✅ Found HH employment data in source_data")
+                employment_data = source_data['employment']
+                if isinstance(employment_data, dict):
+                    employment_name = employment_data.get('name', '')
+                    logger.info(f"💼 HH employment type from dict: {employment_name}")
+                    return employment_name
+                else:
+                    employment_name = str(employment_data)
+                    logger.info(f"💼 HH employment type from string: {employment_name}")
+                    return employment_name
+            
+            # GeekJob format - check jobFormat
+            elif site == 'geekjob' and source_data.get('jobFormat'):
+                logger.info(f"✅ Found GeekJob jobFormat data")
+                job_format = source_data['jobFormat']
+                if isinstance(job_format, dict):
+                    if job_format.get('parttime'):
+                        logger.info(f"💼 GeekJob part-time detected")
+                        return "Частичная занятость"
+                    else:
+                        logger.info(f"💼 GeekJob full-time (default)")
+                        return "Полная занятость"
+        
+        logger.info(f"❌ No employment type found")
+        return None
+    
+    def _extract_key_skills(self, source_data, site, max_skills=3):
+        """Extract key skills information"""
+        logger.info(f"🔧 Extracting key skills for site: {site}")
+        logger.info(f"📋 Source data type: {type(source_data).__name__}")
+        
+        if isinstance(source_data, dict) and source_data.get('key_skills'):
+            logger.info(f"✅ Found key_skills data in source_data")
+            skills_data = source_data['key_skills']
+            if isinstance(skills_data, list):
+                skill_names = []
+                for skill in skills_data[:max_skills]:  # Limit to max_skills
+                    if isinstance(skill, dict) and skill.get('name'):
+                        skill_names.append(skill['name'])
+                    elif isinstance(skill, str):
+                        skill_names.append(skill)
+                
+                if skill_names:
+                    skills_text = ", ".join(skill_names)
+                    logger.info(f"🔧 Key skills extracted: {skills_text}")
+                    return skills_text
+        
+        logger.info(f"❌ No key skills found")
+        return None
+    
+    def _extract_publication_date(self, source_data, site):
+        """Extract publication date information"""
+        logger.info(f"📅 Extracting publication date for site: {site}")
+        logger.info(f"📋 Source data type: {type(source_data).__name__}")
+        
+        if isinstance(source_data, dict):
+            # HH format - ISO date
+            if site == 'hh':
+                date_fields = ['published_at', 'created_at', 'publication_date']
+                for field in date_fields:
+                    if source_data.get(field):
+                        date_value = source_data[field]
+                        logger.info(f"📅 Found HH {field}: {date_value}")
+                        # Basic date formatting - could be enhanced
+                        if isinstance(date_value, str) and len(date_value) >= 10:
+                            # Extract date part from ISO format (YYYY-MM-DD)
+                            date_part = date_value[:10]
+                            logger.info(f"📅 Extracted HH date: {date_part}")
+                            return date_part
+                        return str(date_value)
+            
+            # GeekJob format - log.modify field
+            elif site == 'geekjob':
+                log_data = source_data.get('log', {})
+                if isinstance(log_data, dict) and log_data.get('modify'):
+                    date_value = log_data['modify']
+                    logger.info(f"📅 Found GeekJob log.modify: {date_value}")
+                    # GeekJob uses Russian format like "28 июля"
+                    # For now, just return as-is, could be enhanced with date parsing
+                    return str(date_value)
+        
+        logger.info(f"❌ No publication date found")
+        return None
+    
+    def _extract_professional_role(self, source_data, site):
+        """Extract professional role/category information (HH detailed info)"""
+        logger.info(f"👔 Extracting professional role for site: {site}")
+        logger.info(f"📋 Source data type: {type(source_data).__name__}")
+        
+        if isinstance(source_data, dict) and site == 'hh':
+            # Available from HH's get_vacancy_by_id endpoint
+            professional_roles = source_data.get('professional_roles', [])
+            if professional_roles and isinstance(professional_roles, list):
+                # Get the first role name
+                role = professional_roles[0]
+                if isinstance(role, dict) and role.get('name'):
+                    role_name = role['name']
+                    logger.info(f"👔 Professional role extracted: {role_name}")
+                    return role_name
+        
+        logger.info(f"❌ No professional role found")
+        return None
+    
+    def _extract_working_schedule(self, source_data, site):
+        """Extract working schedule information (HH detailed info)"""
+        logger.info(f"⏰ Extracting working schedule for site: {site}")
+        logger.info(f"📋 Source data type: {type(source_data).__name__}")
+        
+        if isinstance(source_data, dict) and site == 'hh':
+            # Available from HH's get_vacancy_by_id endpoint
+            schedule_parts = []
+            
+            # Working days (e.g., "Пн-Пт")
+            working_days = source_data.get('working_days', [])
+            if working_days and isinstance(working_days, list):
+                day = working_days[0]
+                if isinstance(day, dict) and day.get('name'):
+                    schedule_parts.append(day['name'])
+            
+            # Working hours (e.g., "09:00-18:00")
+            working_time_intervals = source_data.get('working_time_intervals', [])
+            if working_time_intervals and isinstance(working_time_intervals, list):
+                interval = working_time_intervals[0]
+                if isinstance(interval, dict) and interval.get('name'):
+                    schedule_parts.append(interval['name'])
+            
+            if schedule_parts:
+                schedule_text = ", ".join(schedule_parts)
+                logger.info(f"⏰ Working schedule extracted: {schedule_text}")
+                return schedule_text
+        
+        logger.info(f"❌ No working schedule found")
+        return None
+    
+    def _extract_job_description(self, source_data, site):
+        """
+        Extract full job description information (comprehensive, no length limits)
+        
+        Priority order for HH:
+        1. description field (from get_vacancy_by_id using api_vacancy_details URL)
+        2. snippet.description (fallback)
+        3. snippet.requirement (fallback)
+        
+        Priority order for GeekJob:
+        1. description field
+        2. requirements field
+        
+        All content formatted with Telegram HTML support, no truncation.
+        """
+        logger.info(f"📋 Extracting job description for site: {site}")
+        logger.info(f"📋 Source data type: {type(source_data).__name__}")
+
+        if isinstance(source_data, dict):
+            logger.info(f"📋 Source data keys: {source_data.keys()}")
+            # HH format - prioritize description from detailed API, fallback to snippet.requirement
+            if site == 'hh':
+                # First try to get full description from detailed vacancy data (get_vacancy_by_id)
+                if source_data.get('description'):
+                    description = source_data['description']
+                    if isinstance(description, str) and len(description.strip()) > 0:
+                        # Format for telegram with HTML support, preserve full content (NO LENGTH LIMITS)
+                        clean_description = self._format_description_for_telegram(description)
+                        if clean_description and len(clean_description.strip()) > 0:
+                            logger.info(f"📋 Full job description extracted: {len(clean_description)} chars (NO TRUNCATION)")
+                            logger.info(f"📋 Job description preview: {clean_description[:200]}...")
+                            return clean_description
+                
+                # Fallback to snippet data if full description not available
+                if source_data.get('snippet'):
+                    snippet = source_data['snippet']
+                    if isinstance(snippet, dict):
+                        # Try snippet.description first, then snippet.requirement
+                        snippet_content = None
+                        if snippet.get('description'):
+                            snippet_content = snippet['description']
+                            logger.info(f"📋 Using snippet.description for fallback")
+                        elif snippet.get('requirement'):
+                            snippet_content = snippet['requirement']
+                            logger.info(f"📋 Using snippet.requirement for fallback")
+                        
+                        if snippet_content:
+                            # Format for telegram with HTML support, same as full description (NO LENGTH LIMITS)
+                            clean_content = self._format_description_for_telegram(snippet_content)
+                            if clean_content and len(clean_content.strip()) > 0:
+                                logger.info(f"📋 Snippet content extracted: {len(clean_content)} chars (NO TRUNCATION)")
+                                logger.info(f"📋 Snippet content preview: {clean_content[:200]}...")
+                                return clean_content
+            
+            # GeekJob format - check description and requirements fields
+            elif site == 'geekjob':
+                # Try description first, then requirements
+                geekjob_content = None
+                if source_data.get('description'):
+                    geekjob_content = source_data['description']
+                    logger.info(f"📋 Using GeekJob description field")
+                elif source_data.get('requirements'):
+                    geekjob_content = source_data['requirements']
+                    logger.info(f"📋 Using GeekJob requirements field")
+                
+                if geekjob_content and isinstance(geekjob_content, str) and len(geekjob_content.strip()) > 0:
+                    # Format for telegram with HTML support, same as HH (NO LENGTH LIMITS)
+                    clean_content = self._format_description_for_telegram(geekjob_content)
+                    if clean_content and len(clean_content.strip()) > 0:
+                        logger.info(f"📋 GeekJob content extracted: {len(clean_content)} chars (NO TRUNCATION)")
+                        logger.info(f"📋 GeekJob content preview: {clean_content[:200]}...")
+                        return clean_content
+        
+        logger.info(f"❌ No job description found")
+        return None
+    
+    def _format_description_for_telegram(self, html_description):
+        """Format HTML description for Telegram with supported HTML tags"""
+        if not html_description:
+            return ""
+            
+        # Telegram supports: <b>, <strong>, <i>, <em>, <u>, <ins>, <s>, <strike>, <del>, <code>, <pre>
+        # Convert common HTML to Telegram-supported format
+        description = html_description
+        
+        # Replace <ul> and <li> with simple formatting
+        import re
+        description = re.sub(r'<ul[^>]*>', '', description)
+        description = re.sub(r'</ul>', '\n', description)
+        description = re.sub(r'<li[^>]*>', '• ', description)  
+        description = re.sub(r'</li>', '\n', description)
+        
+        # Keep supported HTML tags: <strong>, <b>, <em>, <i>
+        # Remove unsupported tags but keep content
+        description = re.sub(r'<(?!/?(?:strong|b|em|i|u|code|pre)\b)[^>]*>', '', description)
+        
+        # Clean up extra whitespace and newlines
+        description = re.sub(r'\n\s*\n', '\n\n', description)  # Multiple newlines to double
+        description = re.sub(r'^\s+|\s+$', '', description)     # Trim start/end
+        description = re.sub(r' +', ' ', description)           # Multiple spaces to single
+        
+        return description
+    
+    def _extract_job_requirements(self, source_data, site):
+        """Extract job requirements information (brief) - kept for backward compatibility"""
+        # This method now delegates to the new comprehensive description method
+        return self._extract_job_description(source_data, site)
+    
+    def _is_valid_salary_text(self, salary_text):
+        """Check if extracted text looks like valid salary information"""
+        if not salary_text or len(salary_text.strip()) == 0:
+            return False
+        
+        # If text is too long, it's probably not just salary info
+        if len(salary_text) > 200:
+            logger.info(f"📏 Salary text too long ({len(salary_text)} chars), probably not just salary")
+            return False
+        
+        # If it contains HTML tags, it's malformed
+        if '<' in salary_text and '>' in salary_text:
+            logger.info(f"🏷️ Salary text contains HTML tags, rejecting")
+            return False
+        
+        # If it contains href attributes, it's malformed
+        if 'href=' in salary_text:
+            logger.info(f"🔗 Salary text contains href attributes, rejecting")
+            return False
+        
+        # If it contains job titles or company names, it's not salary
+        job_indicators = ['разработчик', 'developer', 'engineer', 'программист', 'analyst', 'manager']
+        location_indicators = ['местоположение', 'location', 'москва', 'санкт-петербург', 'дубай']
+        
+        salary_lower = salary_text.lower()
+        for indicator in job_indicators + location_indicators:
+            if indicator in salary_lower:
+                logger.info(f"🚫 Salary text contains job/location indicator '{indicator}', rejecting")
+                return False
+        
+        logger.info(f"✅ Salary text appears valid: {salary_text[:50]}...")
+        return True

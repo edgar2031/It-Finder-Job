@@ -14,15 +14,17 @@ import time
 logger = LoggerHelper.get_logger(__name__, prefix='geekjob-service')
 
 """
-Example GeekJob API Response Structure:
+GeekJob API Response Structure:
 
+SEARCH ENDPOINT (GeekJob API):
 {
     "data": [
         {
-            "position": "Full-Stack разработчик (PHP/Laravel + Vue3)",
-            "salary": "80K — 200K ₽",
-            "country": null,
-            "city": null,
+            "id": "689c9a736bbca929b703cb03",
+            "position": "Middle Full Stack разработчик (React/Node.js)",
+            "salary": "2K — 3K $",
+            "country": "ОАЭ",
+            "city": "Дубай",
             "jobFormat": {
                 "remote": true,
                 "relocate": false,
@@ -30,35 +32,77 @@ Example GeekJob API Response Structure:
                 "inhouse": false
             },
             "log": {
-                "modify": "28 июля",
+                "modify": "13 августа",
                 "archived": null
             },
             "company": {
                 "type": 1,
-                "name": "Smart Arena",
-                "logo": "240621115705.png",
-                "id": "66754061c694ddcd970c5b7c"
+                "name": "Crypto.news",
+                "logo": "crypto_news_logo.png",
+                "id": "66ace606e5df2c87560b2ac8"
             },
-            "id": "68875aa954c86602e307f484",
-            "sortOrder": "20250728",
-            "weight": 8.113333333333333
-        },
-        ...
+            "sortOrder": "20240813",
+            "weight": 8.5,
+            "description": "Полное описание вакансии...",
+            "requirements": "Требования к кандидату...",
+            "skills": ["React", "Node.js", "TypeScript", "PostgreSQL"],
+            "contact_person": "HR Manager",
+            "views": 245
+        }
     ],
-    "documentsCount": 10,
-    "nextpage": 0,
+    "documentsCount": 15,
+    "nextpage": 2,
     "page": 1,
-    "pagecount": 1
+    "pagecount": 3
 }
 
-Key Fields:
-- position: Job title
-- salary: Salary range (e.g., "80K — 200K ₽", "2.5K — 4.5K $")
-- country/city: Location information (can be null)
-- jobFormat: Work format flags (remote, relocate, parttime, inhouse)
-- company: Company information with logo and ID
-- id: Unique job identifier
-- log.modify: Publication date in Russian format
+DETAILED VACANCY ENDPOINT (get_vacancy_by_id):
+Returns the same structure but for a single vacancy:
+{
+    "data": [
+        {
+            "id": "689c9a736bbca929b703cb03",
+            "position": "Middle Full Stack разработчик (React/Node.js)",
+            "salary": "2K — 3K $",
+            "country": "ОАЭ",
+            "city": "Дубай",
+            "jobFormat": {
+                "remote": true,        // Remote work available
+                "relocate": false,     // Relocation not required
+                "parttime": false,     // Not part-time
+                "inhouse": false       // Not in-house only
+            },
+            "log": {
+                "modify": "13 августа",  // Publication/modification date
+                "archived": null         // Archive status
+            },
+            "company": {
+                "type": 1,                              // Company type
+                "name": "Crypto.news",                  // Company name
+                "logo": "crypto_news_logo.png",        // Company logo filename
+                "id": "66ace606e5df2c87560b2ac8"        // Company ID
+            },
+            "sortOrder": "20240813",
+            "weight": 8.5,
+            "description": "Detailed job description...",
+            "requirements": "Detailed requirements...",
+            "skills": ["React", "Node.js", "TypeScript"],
+            "contact_person": "HR Manager",
+            "views": 245
+        }
+    ]
+}
+
+Key Field Mapping:
+- position: Job title (extracted as 'name' in our formatter)
+- salary: Salary range string (e.g., "2K — 3K $", "80K — 200K ₽")
+- country/city: Location information (can be null, defaults to "Удалённая работа")
+- jobFormat.remote: Boolean indicating remote work availability
+- jobFormat.parttime: Boolean indicating part-time vs full-time employment
+- company.name: Company name
+- company.id: Company identifier for URL construction
+- id: Unique job identifier for URL construction
+- log.modify: Publication date in Russian format (e.g., "13 августа")
 """
 
 

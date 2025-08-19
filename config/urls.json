@@ -42,6 +42,7 @@
                 "api": "https://api.hh.ru/vacancies",
                 "api_areas": "https://api.hh.ru/areas",
                 "api_employers": "https://api.hh.ru/employers",
+                "api_vacancy_details": "https://api.hh.ru/vacancies/{vacancy_id}",
                 "web": "https://hh.ru",
                 "vacancy": "https://hh.ru/vacancy/{job_id}",
                 "employer": "https://hh.ru/employer/{employer_id}",

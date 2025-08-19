@@ -398,6 +398,7 @@ class TelegramBot:
                 job_info['logo_url'] = logo_urls.get('240', logo_urls.get('90', ''))
             
             # Add employer link
+            employer_id = employer.get('id')
             if employer_id:
                 from helpers.config import get_site_config
                 site_config = get_site_config('hh')

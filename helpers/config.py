@@ -260,6 +260,18 @@ class ConfigHelper:
         """Get maximum length for experience level information"""
         return self.get_display_setting('experience_max_length', 20)
     
+    def get_job_description_max_length(self) -> int:
+        """Get maximum length for job descriptions in messages"""
+        return self.get_display_setting('job_description_max_length', 400)
+    
+    def get_job_requirement_max_length(self) -> int:
+        """Get maximum length for job requirements (snippet fallback)"""
+        return self.get_display_setting('job_requirement_max_length', 100)
+    
+    def get_max_title_length(self) -> int:
+        """Get maximum length for job titles in messages and general display"""
+        return self.get_display_setting('max_title_length', 50)
+    
     def get_fallback_localization(self, site_id: str) -> Dict[str, Any]:
         """
         Get fallback localization data for a site
